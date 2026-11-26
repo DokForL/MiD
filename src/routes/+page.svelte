@@ -1090,6 +1090,22 @@
     if (e.key === "j" || e.key === "k") releaseScrollKey(e.key);
   }
 
+  async function renderEvictedTab(tab: Tab) {
+    const { id, content, filePath, fileName, frontmatter, wordCount } = tab;
+    docStore.set({ filePath, fileName, content, renderedHtml: "", frontmatter, wordCount, loading: true, error: null });
+    try {
+      const { renderDocument } = await import("$lib/renderer/render-document");
+      const result = await renderDocument(content, getBaseDir(filePath));
+      if (get(activeTabId) === id) tabStore.restoreRenderedHtml(id, content, result.html);
+    } catch (error) {
+      if (get(activeTabId) === id && tabStore.getActiveTab()?.needsRender) {
+        docStore.update((state) => ({
+          ...state, loading: false, error: translate("files.openFailed", { err: String(error) }),
+        }));
+      }
+    }
+  }
+
   // Sync tab switching with document store — only reads $activeTabId and $tabs
   let prevTabId: string | null = null;
   let prevTabPending = false;
@@ -1099,7 +1115,7 @@
     const allTabs = $tabs;
 
     const tab = allTabs.find((entry) => entry.id === id);
-    const pending = !!tab?.pending;
+    const pending = !!(tab?.pending || tab?.needsRender);
     const switched = id !== prevTabId;
     if (!switched && pending === prevTabPending) return;
 
@@ -1145,6 +1161,10 @@
     if (!tab) return;
     if (tab.pending) {
       void openFile(tab.filePath, tab.id);
+      return;
+    }
+    if (tab.needsRender) {
+      void renderEvictedTab(tab);
       return;
     }
 

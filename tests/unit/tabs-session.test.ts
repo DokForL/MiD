@@ -99,3 +99,28 @@ describe("tab session persistence", () => {
     expect((await freshStore()).getSavedSession()).toBeNull();
   });
 });
+
+describe("rendered tab cache", () => {
+  it("evicts old HTML while retaining edits and the selected tab", async () => {
+    const store = await freshStore();
+    const first = store.addTab("/docs/a.md", "a.md", "source", "<p>source</p>");
+    store.setEditing(first, true);
+    store.updateEditContent(first, "unsaved");
+    for (let i = 0; i < 10; i++) {
+      store.addTab(`/docs/b-${i}.md`, `b-${i}.md`, "second", "<p>second</p>");
+    }
+
+    expect(store.getActiveTab()?.renderedHtml).toBe("<p>second</p>");
+    store.switchTab(first);
+    expect(store.getActiveTab()).toMatchObject({
+      editContent: "unsaved", dirty: true, renderedHtml: "", needsRender: true,
+    });
+    store.restoreRenderedHtml(first, "wrong source", "<p>Wrong</p>");
+    expect(store.getActiveTab()?.needsRender).toBe(true);
+    store.restoreRenderedHtml(first, "source", "<p>Restored</p>");
+    expect(store.getActiveTab()).toMatchObject({
+      editContent: "unsaved", dirty: true, renderedHtml: "<p>Restored</p>",
+    });
+    expect(store.getActiveTab()?.needsRender).toBeUndefined();
+  });
+});

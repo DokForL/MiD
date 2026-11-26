@@ -7,6 +7,7 @@ export interface Tab {
   content: string;
   renderedHtml: string;
   pending?: true;
+  needsRender?: true;
   frontmatter: Record<string, unknown> | null;
   wordCount: number;
   scrollTop: number;
@@ -70,6 +71,39 @@ function saveSession(session: SavedSession) {
 function createTabStore() {
   const tabs = writable<Tab[]>([]);
   const activeTabId = writable<string | null>(HOME_TAB_ID);
+  const renderOrder = new Map<string, number>();
+  let lastAccess = 0;
+  const maxBackgroundBytes = 12 * 1024 * 1024;
+  const maxBackgroundDocuments = 8;
+
+  function pruneRenderCache() {
+    const active = get(activeTabId);
+    const current = get(tabs);
+    const candidates = current.filter((tab) => tab.id !== active && tab.renderedHtml)
+      .sort((a, b) => (renderOrder.get(b.id) ?? 0) - (renderOrder.get(a.id) ?? 0));
+    let bytes = 0;
+    let count = 0;
+    const evicted = new Set<string>();
+    for (const tab of candidates) {
+      const size = tab.renderedHtml.length * 2;
+      if (count >= maxBackgroundDocuments || bytes + size > maxBackgroundBytes) {
+        evicted.add(tab.id);
+      } else {
+        bytes += size;
+        count++;
+      }
+    }
+    if (evicted.size) {
+      tabs.set(current.map((tab) => evicted.has(tab.id)
+        ? { ...tab, renderedHtml: "", needsRender: true }
+        : tab));
+    }
+  }
+
+  activeTabId.subscribe((id) => {
+    if (id && id !== HOME_TAB_ID) renderOrder.set(id, ++lastAccess);
+    pruneRenderCache();
+  });
 
   // Captured once, before the persistence subscription below overwrites the
   // key with this (empty) session. `restoreSession` reads it on launch.
@@ -108,9 +142,9 @@ function createTabStore() {
           // Preserve edit state on re-add — only refresh content/render if not dirty
           if (t.isEditing) {
             const dirty = t.editContent !== content;
-            return { ...t, pending: undefined, content, renderedHtml, frontmatter: frontmatter ?? null, wordCount: wordCount ?? 0, dirty };
+            return { ...t, pending: undefined, needsRender: undefined, content, renderedHtml, frontmatter: frontmatter ?? null, wordCount: wordCount ?? 0, dirty };
           }
-          return { ...t, pending: undefined, content, renderedHtml, frontmatter: frontmatter ?? null, wordCount: wordCount ?? 0, editContent: content, dirty: false };
+          return { ...t, pending: undefined, needsRender: undefined, content, renderedHtml, frontmatter: frontmatter ?? null, wordCount: wordCount ?? 0, editContent: content, dirty: false };
         })
       );
       return existing.id;
@@ -163,6 +197,7 @@ function createTabStore() {
     const idx = currentTabs.findIndex((t) => t.id === id);
     if (idx === -1) return;
 
+    renderOrder.delete(id);
     const newTabs = currentTabs.filter((t) => t.id !== id);
     tabs.set(newTabs);
 
@@ -206,6 +241,7 @@ function createTabStore() {
           ...t,
           content,
           renderedHtml,
+          needsRender: undefined,
           frontmatter: frontmatter ?? t.frontmatter,
           wordCount: wordCount ?? t.wordCount,
         };
@@ -224,6 +260,16 @@ function createTabStore() {
         return next;
       })
     );
+    pruneRenderCache();
+  }
+
+  function restoreRenderedHtml(id: string, content: string, html: string): void {
+    tabs.update((current) => current.map((tab) =>
+      tab.id === id && tab.needsRender && tab.content === content
+        ? { ...tab, renderedHtml: html, needsRender: undefined }
+        : tab
+    ));
+    pruneRenderCache();
   }
 
   function getActiveTab(): Tab | null {
@@ -303,6 +349,7 @@ function createTabStore() {
     saveScrollPosition,
     getSavedSession,
     restorePlaceholders,
+    restoreRenderedHtml,
   };
 }
 
