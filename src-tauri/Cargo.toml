@@ -36,6 +36,9 @@ tauri-plugin-updater = "2"
 [target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = "2"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
 [dev-dependencies]
 # `test` enables Tauri's mock runtime (tauri::test) used by the menu test.
 tauri = { version = "2", features = ["test"] }
@@ -46,4 +49,3 @@ tauri = { version = "2", features = ["test"] }
 [[test]]
 name = "menu_window"
 harness = false
-

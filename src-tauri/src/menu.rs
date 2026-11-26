@@ -202,5 +202,17 @@ pub fn create_menu_with_labels<R: Runtime>(
 #[tauri::command]
 pub fn set_menu_language(app: tauri::AppHandle, labels: MenuLabels) -> Result<(), String> {
     let menu = create_menu_with_labels(&app, &labels).map_err(|e| e.to_string())?;
-    app.set_menu(menu).map(|_| ()).map_err(|e| e.to_string())
+    app.set_menu(menu).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "linux")]
+    crate::title_bar::attach_menu(&app).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_title_bar_theme(window: tauri::WebviewWindow, dark: bool) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    crate::title_bar::set_theme(&window, dark).map_err(|e| e.to_string())?;
+    #[cfg(not(target_os = "linux"))]
+    let _ = (window, dark);
+    Ok(())
 }

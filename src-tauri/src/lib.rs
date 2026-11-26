@@ -1,5 +1,7 @@
 mod commands;
 pub mod menu;
+#[cfg(target_os = "linux")]
+mod title_bar;
 mod single_window;
 mod watcher;
 
@@ -94,6 +96,23 @@ fn parse_mid_url(url: &tauri::Url) -> Option<String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let context = tauri::generate_context!();
+    #[cfg(target_os = "linux")]
+    let mut context = context;
+    #[cfg(target_os = "linux")]
+    let defer_main_window = {
+        let main_window = context
+            .config_mut()
+            .app
+            .windows
+            .iter_mut()
+            .find(|window| window.label == "main" && window.visible && window.decorations);
+        if let Some(window) = main_window {
+            window.visible = false;
+            true
+        } else {
+            false
+        }
+    };
     let builder = tauri::Builder::default();
 
     // Registered first, and only when the setting is on (#71): a later launch
@@ -136,11 +155,22 @@ pub fn run() {
             single_window::get_open_in_existing_window,
             single_window::set_open_in_existing_window,
             menu::set_menu_language,
+            menu::set_title_bar_theme,
         ])
-        .setup(|app| {
+        .setup(move |app| {
+            #[cfg(target_os = "linux")]
+            if defer_main_window {
+                if let Some(window) = app.get_webview_window("main") {
+                    title_bar::install(&window)?;
+                    window.show()?;
+                }
+            }
+
             let handle = app.handle().clone();
             let menu = menu::create_menu(&handle)?;
             app.set_menu(menu)?;
+            #[cfg(target_os = "linux")]
+            title_bar::attach_menu(&handle)?;
 
             // Red-button (window) close routes through the frontend quit guard
             // instead of closing, so unsaved changes get a confirm dialog (#54).

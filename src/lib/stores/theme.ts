@@ -1,4 +1,5 @@
 import { writable, get } from "svelte/store";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 
 export type ThemeMode = "light" | "dark" | "system";
 
@@ -26,6 +27,9 @@ export function applyCurrentTheme(): void {
     html.classList.add("dark");
   } else {
     html.classList.remove("dark");
+  }
+  if (isTauri()) {
+    void invoke("set_title_bar_theme", { dark: theme === "dark" }).catch(console.error);
   }
 }
 

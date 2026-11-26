@@ -1,0 +1,42 @@
+headerbar.mid-titlebar {
+    min-height: 30px;
+    padding: 0 6px;
+    background: #fafafa;
+    color: #1c1c1e;
+    border-bottom: 1px solid #e5e5e5;
+    box-shadow: none;
+}
+
+headerbar.mid-titlebar.dark {
+    background: #161618;
+    color: #e5e5e7;
+    border-bottom-color: #2c2c2e;
+}
+
+.mid-titlebar menubar {
+    background: transparent;
+    color: inherit;
+}
+
+.mid-titlebar menubar > menuitem {
+    padding: 3px 8px;
+    color: inherit;
+}
+
+.mid-titlebar menubar > menuitem:hover,
+.mid-titlebar button.titlebutton:hover {
+    background: alpha(currentColor, 0.12);
+}
+
+.mid-titlebar button.titlebutton {
+    min-width: 24px;
+    min-height: 24px;
+    margin: 0;
+    padding: 0;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    -gtk-icon-theme: "Adwaita";
+    -gtk-icon-style: symbolic;
+}
