@@ -50,6 +50,7 @@ pub fn attach_menu(app: &AppHandle) -> tauri::Result<()> {
             if let (Some(header), Ok(content)) = (header(&main), main.default_vbox()) {
                 for child in content.children() {
                     if let Ok(menu) = child.downcast::<gtk::MenuBar>() {
+                        style_submenus(&menu, header.style_context().has_class("dark"));
                         content.remove(&menu);
                         header.pack_start(&menu);
                         menu.show();
@@ -67,6 +68,11 @@ pub fn set_theme(window: &WebviewWindow, dark: bool) -> tauri::Result<()> {
     window.run_on_main_thread(move || {
         if let Some(header) = header(&main) {
             set_dark_class(&header.style_context(), dark);
+            for child in header.children() {
+                if let Ok(menu) = child.downcast::<gtk::MenuBar>() {
+                    style_submenus(&menu, dark);
+                }
+            }
         }
     })
 }
@@ -83,6 +89,29 @@ fn header(window: &WebviewWindow) -> Option<gtk::HeaderBar> {
         .style_context()
         .has_class(STYLE_CLASS)
         .then_some(header)
+}
+
+fn style_submenus(container: &impl IsA<gtk::Container>, dark: bool) {
+    for_each_submenu(container, &mut |popup| {
+        let style = popup.style_context();
+        style.add_class("mid-menu");
+        set_dark_class(&style, dark);
+    });
+}
+
+fn for_each_submenu(container: &impl IsA<gtk::Container>, visit: &mut impl FnMut(&gtk::Menu)) {
+    for child in container.children() {
+        let Some(popup) = child
+            .downcast::<gtk::MenuItem>()
+            .ok()
+            .and_then(|item| item.submenu())
+            .and_then(|submenu| submenu.downcast::<gtk::Menu>().ok())
+        else {
+            continue;
+        };
+        visit(&popup);
+        for_each_submenu(&popup, visit);
+    }
 }
 
 fn set_dark_class(style: &gtk::StyleContext, dark: bool) {

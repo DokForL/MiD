@@ -40,3 +40,32 @@ headerbar.mid-titlebar.dark {
     -gtk-icon-theme: "Adwaita";
     -gtk-icon-style: symbolic;
 }
+
+menu.mid-menu {
+    background: #fafafa;
+    color: #1c1c1e;
+    border-color: #e5e5e5;
+}
+
+menu.mid-menu.dark {
+    background: #161618;
+    color: #e5e5e7;
+    border-color: #2c2c2e;
+}
+
+menu.mid-menu menuitem {
+    color: inherit;
+}
+
+menu.mid-menu menuitem:disabled {
+    color: alpha(currentColor, 0.5);
+}
+
+menu.mid-menu menuitem:hover {
+    background: alpha(currentColor, 0.12);
+    color: inherit;
+}
+
+menu.mid-menu separator {
+    background: alpha(currentColor, 0.16);
+}
