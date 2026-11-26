@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { prepareDocumentOutput } from "$lib/renderer/document-output";
   import { document } from "../stores/document";
   import { MOD } from "$lib/utils/platform";
   import { settings } from "../stores/settings";
@@ -22,6 +23,7 @@
     editMode = "view",
     onSetMode = (_m: "view" | "split" | "edit") => {},
     onSave = () => {},
+    onPrint = () => window.print(),
     onOpenSettings = () => {},
     canPresent = false,
     presenting = false,
@@ -38,6 +40,7 @@
     editMode?: "view" | "split" | "edit";
     onSetMode?: (m: "view" | "split" | "edit") => void;
     onSave?: () => void;
+    onPrint?: () => void;
     onOpenSettings?: () => void;
     canPresent?: boolean;
     presenting?: boolean;
@@ -84,18 +87,13 @@
     }));
   }
 
-  // `@tauri-apps/api` exposes no print() on Webview or Window (checked through
-  // 2.11), so the former try-branch calling `getCurrentWebview().print()` was
-  // undefined at runtime and always fell through to this. Same behaviour, no
-  // dead code, no type error.
-  function handleExportPdf() {
-    window.print();
-  }
-
   async function handleCopyRichText() {
     const article = globalThis.document?.querySelector("article.prose");
-    if (!article || !$document.content) return;
-    const success = await copyAsRichText(article.innerHTML, $document.content);
+    const { filePath, content } = $document;
+    if (!article || !content) return;
+    await prepareDocumentOutput(false);
+    if (!article.isConnected || $document.filePath !== filePath || $document.content !== content) return;
+    const success = await copyAsRichText(article.innerHTML, content);
     copyFeedback = success ? translate("common.copied") : translate("common.copyFailed");
     showCopyMenu = false;
     setTimeout(() => (copyFeedback = ""), 1500);
@@ -310,7 +308,7 @@
     </div>
 
     <button
-      onclick={handleExportPdf}
+      onclick={onPrint}
       class="btn btn-icon"
       disabled={!$document.renderedHtml || isEditing}
       title={!$document.renderedHtml

@@ -2,6 +2,7 @@
   import { onMount, tick } from "svelte";
   import { document as docStore } from "$lib/stores/document";
   import { tabStore, HOME_TAB_ID, type Tab } from "$lib/stores/tabs";
+  import { prepareDocumentOutput } from "$lib/renderer/document-output";
   import { resolveLocalPath, isMarpDoc } from "$lib/renderer/document-info";
   import {
     allowAssets,
@@ -555,12 +556,14 @@
   // accelerator and the keydown for one press — WebView2 also binds Ctrl+P
   // itself, and two print dialogs is worse than none.
   let printInFlight = false;
-  function printDocument() {
+  async function printDocument() {
     if (printInFlight) return;
     if (!$docStore.renderedHtml || activeTab?.isEditing) return;
     printInFlight = true;
+    const printedTab = get(activeTabId);
     try {
-      window.print();
+      await prepareDocumentOutput();
+      if (get(activeTabId) === printedTab) window.print();
     } finally {
       // window.print() is modal on every platform we ship, so by the time it
       // returns the dialog has been dismissed; a short hold covers the
@@ -1216,6 +1219,7 @@
       editMode={activeEditMode}
       onSetMode={setMode}
       onSave={() => activeTab && handleSave(activeTab)}
+      onPrint={printDocument}
       onOpenSettings={() => (settingsVisible = true)}
       canPresent={activeIsMarp}
       presenting={presenting}
@@ -1350,6 +1354,7 @@
         <FrontmatterBar />
         <MarkdownRenderer
           html={$docStore.renderedHtml}
+          optimizeLargeDocument
           onImageClick={(src, all, idx) => { lightboxImages = all; lightboxIndex = idx; lightboxVisible = true; }}
           onLocalLink={handleLocalLink}
         />

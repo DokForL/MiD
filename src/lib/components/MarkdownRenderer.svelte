@@ -1,20 +1,24 @@
 <script lang="ts">
-  import { onMount, tick } from "svelte";
+  import { onMount } from "svelte";
   import { get } from "svelte/store";
   import { invoke } from "@tauri-apps/api/core";
   import { settings, fontFamilyMap, getContentMaxWidth } from "$lib/stores/settings";
   import { tocEntries, activeHeadingId, extractToc, isObserverPaused } from "$lib/stores/toc";
   import { aiLookup, setPendingSelection } from "$lib/stores/aiLookup";
+  import { searchQuery } from "$lib/stores/search";
+  import { registerDocumentOutput } from "$lib/renderer/document-output";
   import { t, translate } from "$lib/i18n";
   import DOMPurify from "dompurify";
   import { MERMAID_SANITIZE_CONFIG } from "$lib/renderer/mermaid-sanitize";
 
   let {
     html = "",
+    optimizeLargeDocument = false,
     onImageClick = (_src: string, _all: string[], _idx: number) => {},
     onLocalLink,
   }: {
     html: string;
+    optimizeLargeDocument?: boolean;
     onImageClick?: (src: string, allImages: string[], index: number) => void;
     /**
      * Called when a link to a local file (relative or absolute path, no URL
@@ -81,46 +85,68 @@
     });
   }
 
-  async function renderMermaidBlocks() {
-    if (!articleEl) return;
-    const blocks = articleEl.querySelectorAll("code.language-mermaid");
-    if (blocks.length === 0) return;
+  const diagramJobs = new WeakMap<HTMLElement, Promise<void>>();
+  let diagramQueue = Promise.resolve();
 
-    const article = articleEl;
-    let mermaid: typeof import("mermaid").default;
-    try {
-      ({ default: mermaid } = await import("mermaid"));
-    } catch {
-      return;
-    }
-    if (articleEl !== article) return;
+  function renderDiagram(pre: HTMLElement, article: HTMLElement): Promise<void> {
+    const running = diagramJobs.get(pre);
+    if (running) return running;
 
-    for (const block of blocks) {
-      const pre = block.parentElement;
-      if (!pre || pre.tagName !== "PRE" || !article.contains(pre)) continue;
-      if (pre.dataset.mermaidRendered) continue;
-      pre.dataset.mermaidRendered = "pending";
+    const source = pre.querySelector(":scope > code.language-mermaid")?.textContent;
+    if (!source) return Promise.resolve();
 
-      const source = block.textContent ?? "";
+    const job = diagramQueue.then(async () => {
+      if (articleEl !== article || !article.contains(pre)) return;
       const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
-
       try {
+        const { default: mermaid } = await import("mermaid");
+        if (!article.contains(pre) || articleEl !== article) return;
         initMermaid(mermaid);
         const { svg } = await mermaid.render(id, source);
-        if (!article.contains(pre) || articleEl !== article) continue;
+        if (!article.contains(pre) || articleEl !== article) return;
         const container = document.createElement("div");
         container.className = "mermaid-diagram my-4 flex justify-center";
-        // #security: never trust Mermaid's SVG straight into the DOM. Even in
-        // strict mode this is the last gate before an <svg> from an untrusted
-        // document is live. The allowlist lives in renderer/mermaid-sanitize.ts
-        // because the Quick Look extension renders diagrams too and the two
-        // paths must not drift apart; see the notes there before changing it.
+        const line = pre.getAttribute("data-source-line");
+        if (line !== null) container.setAttribute("data-source-line", line);
+        // Strict Mermaid config and a final SVG allowlist both apply.
         container.innerHTML = DOMPurify.sanitize(svg, MERMAID_SANITIZE_CONFIG);
         pre.replaceWith(container);
       } catch {
-        // Leave the code block as-is if Mermaid fails
-        pre.dataset.mermaidRendered = "failed";
+        // Leave invalid diagrams available as code.
       }
+    });
+    diagramJobs.set(pre, job);
+    diagramQueue = job;
+    return job;
+  }
+
+  function diagramBlocks(article: HTMLElement): HTMLElement[] {
+    return Array.from(article.querySelectorAll<HTMLElement>("pre:has(> code.language-mermaid)"));
+  }
+
+  async function prepareOutput(loadImages: boolean) {
+    const article = articleEl;
+    if (!article) return;
+    const diagrams = diagramBlocks(article).map((pre) => renderDiagram(pre, article));
+    if (!loadImages) {
+      await Promise.all(diagrams);
+      return;
+    }
+    const images = Array.from(article.querySelectorAll("img"), (img) => {
+      img.loading = "eager";
+      return img.decode().catch(() => {});
+    });
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.all([
+        ...diagrams,
+        Promise.race([
+          Promise.all(images),
+          new Promise<void>((resolve) => { deadline = setTimeout(resolve, 3000); }),
+        ]),
+      ]);
+    } finally {
+      clearTimeout(deadline);
     }
   }
 
@@ -182,7 +208,7 @@
   }
 
   onMount(() => {
-    articleEl?.addEventListener("contextmenu", handleContextMenu);
+    const unregisterOutput = registerDocumentOutput(prepareOutput);
     const highlights = CSS.highlights;
     const highlightName = "md-text-selection";
     let paintedHighlight: Highlight | undefined;
@@ -212,7 +238,7 @@
     return () => {
       document.removeEventListener("selectionchange", updateSelectionHighlight);
       clearSelectionHighlight();
-      articleEl?.removeEventListener("contextmenu", handleContextMenu);
+      unregisterOutput();
       observer?.disconnect();
       // Remove the body-level tooltip so it can't outlive the component.
       tooltipEl?.remove();
@@ -221,38 +247,50 @@
   });
 
   $effect(() => {
-    // Re-run when html changes
     html;
+    const article = articleEl;
+    if (!article) return;
 
-    // A re-render (e.g. opening a linked file in a new tab) replaces the
-    // article, so a hover's mouseleave may never fire — clear any stuck tooltip.
     hideTooltip();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let diagrams: IntersectionObserver | undefined;
+    // Wait until the inserted HTML has had a paint opportunity.
+    const frame = requestAnimationFrame(() => {
+      timer = setTimeout(() => {
+        tocEntries.set(extractToc(article));
+        setupTocObserver();
 
-    tick().then(() => {
-      if (!articleEl) return;
+        const blocks = diagramBlocks(article);
+        if (blocks.length && typeof IntersectionObserver === "function") {
+          diagrams = new IntersectionObserver((entries, current) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting) continue;
+              current.unobserve(entry.target);
+              void renderDiagram(entry.target as HTMLElement, article);
+            }
+          }, { rootMargin: "480px 0px" });
+          blocks.forEach((pre) => diagrams!.observe(pre));
+        } else {
+          blocks.forEach((pre) => void renderDiagram(pre, article));
+        }
 
-      // Extract TOC entries
-      const entries = extractToc(articleEl);
-      tocEntries.set(entries);
-
-      // Set up intersection observer for active heading
-      setupTocObserver();
-
-      // Add copy buttons to code blocks
-      addCodeCopyButtons();
-
-      // Add image click handlers for lightbox
-      addImageClickHandlers();
-
-      // Add link hover tooltips
-      addLinkTooltips();
-
-      // Open external links in system browser
-      addLinkHandlers();
-
-      // Render Mermaid diagrams
-      renderMermaidBlocks();
+        const codeBlocks = article.querySelectorAll("pre");
+        let index = 0;
+        function addBatch() {
+          // Cap DOM mutations per task to let input and paint run between batches.
+          const end = Math.min(index + 32, codeBlocks.length);
+          for (; index < end; index++) addCodeCopyButton(codeBlocks[index]);
+          if (index < codeBlocks.length) timer = setTimeout(addBatch, 0);
+        }
+        addBatch();
+      }, 0);
     });
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+      diagrams?.disconnect();
+      observer?.disconnect();
+    };
   });
 
   // The copy buttons are plain DOM, so relabel them when the language changes.
@@ -261,116 +299,93 @@
     articleEl?.querySelectorAll(".code-copy-btn").forEach((btn) => (btn.textContent = label));
   });
 
-  function addImageClickHandlers() {
-    if (!articleEl) return;
-    const imgs = articleEl.querySelectorAll("img");
-    const allSrcs = Array.from(imgs).map((img) => img.src).filter(Boolean);
-
-    imgs.forEach((img, idx) => {
-      if (img.dataset.lightboxBound) return;
-      img.dataset.lightboxBound = "true";
-      img.style.cursor = "zoom-in";
-      img.addEventListener("click", () => {
-        onImageClick(img.src, allSrcs, idx);
-      });
-    });
+  function anchorAt(target: EventTarget | null): HTMLAnchorElement | null {
+    return target instanceof Element ? target.closest<HTMLAnchorElement>("a[href]") : null;
   }
 
-  function addLinkTooltips() {
-    if (!articleEl) return;
+  function showLinkTooltip(event: MouseEvent | FocusEvent) {
+    const link = anchorAt(event.target);
+    if (!link || anchorAt(event.relatedTarget) === link) return;
+    const href = link.getAttribute("href");
+    if (!href || href.startsWith("#")) return;
 
-    // Create tooltip element once
-    // Sweep any orphaned tooltips left by dev HMR reloads so they can't pile up.
-    document.querySelectorAll(".link-tooltip").forEach((el) => {
-      if (el !== tooltipEl) el.remove();
-    });
-    if (!tooltipEl || !tooltipEl.isConnected) {
+    if (!tooltipEl) {
       tooltipEl = document.createElement("div");
       tooltipEl.className = "link-tooltip";
       document.body.appendChild(tooltipEl);
     }
-
-    const links = articleEl.querySelectorAll("a[href]");
-    links.forEach((link) => {
-      if ((link as HTMLElement).dataset.tooltipBound) return;
-      (link as HTMLElement).dataset.tooltipBound = "true";
-
-      link.addEventListener("mouseenter", (e) => {
-        const href = link.getAttribute("href") ?? "";
-        if (!href || href.startsWith("#")) return;
-        tooltipEl!.textContent = href;
-        tooltipEl!.style.display = "block";
-        const rect = (e.target as HTMLElement).getBoundingClientRect();
-        tooltipEl!.style.left = `${rect.left}px`;
-        tooltipEl!.style.top = `${rect.bottom + 4}px`;
-      });
-
-      link.addEventListener("mouseleave", hideTooltip);
-    });
+    const rect = link.getBoundingClientRect();
+    tooltipEl.textContent = href;
+    tooltipEl.style.left = `${rect.left}px`;
+    tooltipEl.style.top = `${rect.bottom + 4}px`;
+    tooltipEl.style.display = "block";
   }
 
-  function addLinkHandlers() {
-    if (!articleEl) return;
-    const links = articleEl.querySelectorAll("a[href]");
-    links.forEach((link) => {
-      if ((link as HTMLElement).dataset.linkBound) return;
-      const href = link.getAttribute("href") ?? "";
-      // Skip anchor links (in-page navigation handled by the browser default).
-      if (!href || href.startsWith("#")) return;
-      (link as HTMLElement).dataset.linkBound = "true";
-      link.addEventListener("click", async (e) => {
-        e.preventDefault();
-        hideTooltip();
-        // Local file path (no URL scheme, or a file: URL) → let the parent
-        // resolve it against the current document and open it (#30).
-        if (onLocalLink && !isUrlHref(href)) {
-          onLocalLink(href);
-          return;
-        }
-        // Real URL → external opener (browser, mail client, …).
-        try {
-          const { openUrl } = await import("@tauri-apps/plugin-opener");
-          await openUrl(href);
-        } catch {
-          window.open(href, "_blank");
-        }
-      });
-    });
+  function leaveLink(event: MouseEvent | FocusEvent) {
+    if (anchorAt(event.target) !== anchorAt(event.relatedTarget)) hideTooltip();
   }
 
-  function addCodeCopyButtons() {
-    if (!articleEl) return;
-    const pres = articleEl.querySelectorAll("pre");
+  async function clickArticle(event: MouseEvent) {
+    const target = event.target;
+    if (!(target instanceof Element) || !articleEl) return;
 
-    for (const pre of pres) {
-      if (pre.querySelector(".code-copy-btn")) continue;
-      if (pre.dataset.mermaidRendered) continue;
+    const copy = target.closest<HTMLButtonElement>(".code-copy-btn");
+    if (copy) {
+      const code = copy.parentElement?.querySelector("code");
+      await navigator.clipboard.writeText(code?.textContent ?? "");
+      copy.textContent = translate("markdown.copied");
+      setTimeout(() => (copy.textContent = translate("markdown.copy")), 1500);
+      return;
+    }
 
-      // Make pre relative for absolute positioning of the button
-      pre.style.position = "relative";
+    if (target instanceof HTMLImageElement) {
+      const images = Array.from(articleEl.querySelectorAll<HTMLImageElement>("img[src]"))
+        .filter((image) => image.src);
+      onImageClick(target.src, images.map((image) => image.src), images.indexOf(target));
+    }
 
-      const btn = document.createElement("button");
-      btn.className = "code-copy-btn";
-      btn.textContent = translate("markdown.copy");
-      btn.addEventListener("click", () => {
-        const code = pre.querySelector("code");
-        const text = code?.textContent ?? pre.textContent ?? "";
-        navigator.clipboard.writeText(text).then(() => {
-          btn.textContent = translate("markdown.copied");
-          setTimeout(() => (btn.textContent = translate("markdown.copy")), 1500);
-        });
-      });
-
-      pre.appendChild(btn);
+    const href = anchorAt(target)?.getAttribute("href");
+    if (!href || href.startsWith("#")) return;
+    event.preventDefault();
+    hideTooltip();
+    if (onLocalLink && !isUrlHref(href)) {
+      onLocalLink(href);
+      return;
+    }
+    try {
+      const { openUrl } = await import("@tauri-apps/plugin-opener");
+      await openUrl(href);
+    } catch {
+      window.open(href, "_blank");
     }
   }
+
+  function addCodeCopyButton(pre: HTMLPreElement) {
+    if (!pre.isConnected || pre.querySelector(".code-copy-btn")) return;
+    pre.style.position = "relative";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "code-copy-btn";
+    button.textContent = translate("markdown.copy");
+    pre.appendChild(button);
+  }
+
 </script>
 
+<!-- Delegated listeners act on native links and buttons inside the article. -->
+<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions a11y_mouse_events_have_key_events -->
 <article
+  onclick={clickArticle}
+  onmouseover={showLinkTooltip}
+  onmouseout={leaveLink}
+  onfocusin={showLinkTooltip}
+  onfocusout={leaveLink}
+  oncontextmenu={handleContextMenu}
   bind:this={articleEl}
   class="md-content prose prose-slate dark:prose-invert max-w-none mx-auto px-8 py-8 transition-all"
   class:wrap-code={$settings.wrapCodeBlocks}
   class:paints-selection={paintsSelection}
+  class:defer-block-layout={optimizeLargeDocument && html.length >= 256 * 1024 && !$searchQuery}
   style="
     max-width: {getContentMaxWidth($settings)};
     font-size: {$settings.fontSize}px;
@@ -413,6 +428,19 @@
     --tw-prose-pre-bg: #1c1c1e;
     --tw-prose-th-borders: #3a3a3c;
     --tw-prose-td-borders: #2c2c2e;
+  }
+
+  article :global(img) {
+    cursor: zoom-in;
+  }
+
+  @media screen {
+    /* Keep native find/selection and source anchors in the DOM. Skip only
+       the inner layout of later blocks in large read-only documents. */
+    .defer-block-layout > :global(:is(p, blockquote, pre, table, ul, ol):nth-child(n + 13)) {
+      content-visibility: auto;
+      contain-intrinsic-block-size: auto 3lh;
+    }
   }
 
   /* Typography refinement */
