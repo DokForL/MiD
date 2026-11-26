@@ -65,6 +65,16 @@
     color: #636366;
   }
 
+  :global(html.viewport-resizing) .status-bar {
+    background: #fafafa;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  :global(html.dark.viewport-resizing) .status-bar {
+    background: #161618;
+  }
+
   .sep {
     color: #d1d1d6;
   }

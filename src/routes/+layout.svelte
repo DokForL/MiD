@@ -7,6 +7,26 @@
 
   onMount(() => {
     initThemeListener();
+
+    const root = document.documentElement;
+    let resizeEnd: number | undefined;
+    function handleResize() {
+      if (resizeEnd === undefined) {
+        root.classList.add("viewport-resizing");
+      } else {
+        window.clearTimeout(resizeEnd);
+      }
+      resizeEnd = window.setTimeout(() => {
+        resizeEnd = undefined;
+        root.classList.remove("viewport-resizing");
+      }, 150);
+    }
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.clearTimeout(resizeEnd);
+      root.classList.remove("viewport-resizing");
+    };
   });
 </script>
 

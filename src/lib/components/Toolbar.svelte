@@ -374,6 +374,17 @@
     border-bottom-color: #2c2c2e;
   }
 
+  /* Avoid resampling the document backdrop for every intermediate viewport size. */
+  :global(html.viewport-resizing) .toolbar {
+    background: #fafafa;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  :global(html.dark.viewport-resizing) .toolbar {
+    background: #161618;
+  }
+
   .toolbar-left {
     display: flex;
     align-items: center;
