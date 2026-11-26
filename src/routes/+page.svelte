@@ -1397,7 +1397,7 @@
       <ScrollToTop />
     {/if}
     <ImageLightbox bind:visible={lightboxVisible} src="" images={lightboxImages} bind:index={lightboxIndex} />
-  {:else}
+  {:else if startupResolved && $activeTabId === HOME_TAB_ID}
     <EmptyState onOpenUrl={() => { pasteDefaultMode = "url"; pasteVisible = true; }} />
   {/if}
   </div>
