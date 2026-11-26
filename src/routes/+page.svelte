@@ -54,6 +54,8 @@
   import { chromeTop, sideTabsWidth, SIDE_TABS_CHROME, TOP_TABS_CHROME } from "$lib/utils/layout";
   import { saveProgress, getProgress } from "$lib/stores/readingProgress";
 
+  let startupResolved = $state(false);
+  let startupUpdateScheduled = false;
   let searchVisible = $state(false);
   let pasteVisible = $state(false);
   let pasteDefaultMode = $state<"paste" | "url">("paste");
@@ -741,8 +743,11 @@
       const requested = typeof cliPath === "string" && cliPath ? cliPath : openedFiles[0];
       if (requested) await openFile(requested);
       if ($settings.restoreTabsOnLaunch) await restoreSession(!requested);
-      void checkForUpdates();
-    })();
+      startupResolved = true;
+    })().catch((error) => {
+      console.error("Could not restore startup documents:", error);
+      startupResolved = true;
+    });
 
     return () => {
       stopFileWatcher();
@@ -754,6 +759,30 @@
       window.removeEventListener("scroll", handleScrollForProgress);
       window.removeEventListener("beforeunload", saveProgressNow);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  });
+
+  $effect(() => {
+    if (!startupResolved || startupUpdateScheduled || $docStore.loading
+        || (activeTab?.pending && !$docStore.error)) return;
+    let idle: number | undefined;
+    let timer: number | undefined;
+    function check() {
+      startupUpdateScheduled = true;
+      void checkForUpdates();
+    }
+    // Let the home screen or selected document paint before starting the check.
+    const frame = requestAnimationFrame(() => {
+      if (typeof window.requestIdleCallback === "function") {
+        idle = window.requestIdleCallback(check, { timeout: 1500 });
+      } else {
+        timer = window.setTimeout(check, 250);
+      }
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      if (idle !== undefined) window.cancelIdleCallback(idle);
+      if (timer !== undefined) window.clearTimeout(timer);
     };
   });
 
@@ -1277,13 +1306,13 @@
          way to edit (#52). A real (even empty) file tab always shows here. -->
     {#if presenting && activeIsMarp}
       {#await import("$lib/components/PresentationView.svelte") then { default: PresentationView }}
-      <PresentationView
-        content={$docStore.content}
-        baseDir={activeTab ? getBaseDir(activeTab.filePath) : ""}
-        paginate={activePaginate}
-        onExit={() => (presenting = false)}
-        onLocalLink={handleLocalLink}
-      />
+        <PresentationView
+          content={$docStore.content}
+          baseDir={activeTab ? getBaseDir(activeTab.filePath) : ""}
+          paginate={activePaginate}
+          onExit={() => (presenting = false)}
+          onLocalLink={handleLocalLink}
+        />
       {/await}
     {:else if activeTab?.isEditing && splitMode}
       <!-- Split (#19): editor left, live preview right. Both panes are fixed

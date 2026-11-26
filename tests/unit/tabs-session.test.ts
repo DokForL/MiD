@@ -124,3 +124,19 @@ describe("rendered tab cache", () => {
     expect(store.getActiveTab()?.needsRender).toBeUndefined();
   });
 });
+
+it("writes session storage only when the saved tab state changes", async () => {
+  const store = await freshStore();
+  const storage = vi.spyOn(globalThis.localStorage, "setItem");
+  const id = store.addTab("/docs/a.md", "a.md", "saved", "<p>saved</p>");
+  storage.mockClear();
+
+  store.setEditing(id, true);
+  store.updateEditContent(id, "draft");
+  store.saveScrollPosition();
+  expect(storage).not.toHaveBeenCalled();
+
+  store.goHome();
+  expect(storage).toHaveBeenCalledTimes(1);
+  expect(session()).toEqual({ paths: ["/docs/a.md"], activePath: null });
+});

@@ -61,13 +61,6 @@ function loadSession(): SavedSession | null {
   }
 }
 
-function saveSession(session: SavedSession) {
-  if (typeof localStorage === "undefined") return;
-  try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  } catch {}
-}
-
 function createTabStore() {
   const tabs = writable<Tab[]>([]);
   const activeTabId = writable<string | null>(HOME_TAB_ID);
@@ -108,14 +101,23 @@ function createTabStore() {
   // Captured once, before the persistence subscription below overwrites the
   // key with this (empty) session. `restoreSession` reads it on launch.
   const savedSession = loadSession();
+  let lastPersistedSession: SavedSession | undefined;
 
   function persistSession() {
     const currentTabs = get(tabs);
     const active = currentTabs.find((t) => t.id === get(activeTabId));
-    saveSession({
+    const session = {
       paths: currentTabs.filter((t) => isRestorablePath(t.filePath)).map((t) => t.filePath),
       activePath: active && isRestorablePath(active.filePath) ? active.filePath : null,
-    });
+    };
+    if (typeof localStorage === "undefined") return;
+    if (lastPersistedSession?.activePath === session.activePath
+        && lastPersistedSession.paths.length === session.paths.length
+        && lastPersistedSession.paths.every((path, index) => path === session.paths[index])) return;
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      lastPersistedSession = session;
+    } catch {}
   }
   tabs.subscribe(persistSession);
   activeTabId.subscribe(persistSession);
