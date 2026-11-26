@@ -72,6 +72,9 @@ pub fn set_theme(window: &WebviewWindow, dark: bool) -> tauri::Result<()> {
     window.run_on_main_thread(move || {
         if let Some(header) = header(&main) {
             set_dark_class(&header.style_context(), dark);
+            let (red, green, blue) = if dark { (22, 22, 24) } else { (250, 250, 250) };
+            // Fill newly exposed pixels while WebKit paints the larger viewport.
+            let _ = main.set_background_color(Some(tauri::webview::Color(red, green, blue, 255)));
             for child in header.children() {
                 if let Ok(menu) = child.downcast::<gtk::MenuBar>() {
                     style_submenus(&menu, dark);
