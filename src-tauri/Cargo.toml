@@ -49,3 +49,8 @@ tauri = { version = "2", features = ["test"] }
 [[test]]
 name = "menu_window"
 harness = false
+
+
+[profile.release]
+opt-level = "s"
+strip = "symbols"
