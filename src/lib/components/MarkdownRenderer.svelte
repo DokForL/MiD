@@ -6,7 +6,6 @@
   import { tocEntries, activeHeadingId, extractToc, isObserverPaused } from "$lib/stores/toc";
   import { aiLookup, setPendingSelection } from "$lib/stores/aiLookup";
   import { t, translate } from "$lib/i18n";
-  import mermaid from "mermaid";
   import DOMPurify from "dompurify";
   import { MERMAID_SANITIZE_CONFIG } from "$lib/renderer/mermaid-sanitize";
 
@@ -43,7 +42,7 @@
     if (tooltipEl) tooltipEl.style.display = "none";
   }
 
-  function initMermaid() {
+  function initMermaid(mermaid: typeof import("mermaid").default) {
     const isDark = document.documentElement.classList.contains("dark");
     const theme = isDark ? "dark" : "default";
     if (theme === lastMermaidTheme) return;
@@ -87,18 +86,28 @@
     const blocks = articleEl.querySelectorAll("code.language-mermaid");
     if (blocks.length === 0) return;
 
-    initMermaid();
+    const article = articleEl;
+    let mermaid: typeof import("mermaid").default;
+    try {
+      ({ default: mermaid } = await import("mermaid"));
+    } catch {
+      return;
+    }
+    if (articleEl !== article) return;
 
     for (const block of blocks) {
       const pre = block.parentElement;
-      if (!pre || pre.tagName !== "PRE") continue;
+      if (!pre || pre.tagName !== "PRE" || !article.contains(pre)) continue;
       if (pre.dataset.mermaidRendered) continue;
+      pre.dataset.mermaidRendered = "pending";
 
       const source = block.textContent ?? "";
       const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
 
       try {
+        initMermaid(mermaid);
         const { svg } = await mermaid.render(id, source);
+        if (!article.contains(pre) || articleEl !== article) continue;
         const container = document.createElement("div");
         container.className = "mermaid-diagram my-4 flex justify-center";
         // #security: never trust Mermaid's SVG straight into the DOM. Even in

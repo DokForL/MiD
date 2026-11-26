@@ -1,3 +1,5 @@
+import { isMarpDoc, resolveLocalPath } from "./document-info";
+export { isMarpDoc, resolveLocalPath } from "./document-info";
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import taskLists from "markdown-it-task-lists";
@@ -78,16 +80,6 @@ export interface RenderResult {
   assetPaths: string[];
   /** True when the frontmatter declares `marp: true` — a Marp slide deck (#44). */
   isMarp: boolean;
-}
-
-/**
- * Whether a parsed frontmatter block marks the document as a Marp deck. The
- * naive frontmatter parser stores values as strings, so `marp: true` arrives as
- * the string `"true"`; accept both that and a real boolean.
- */
-export function isMarpDoc(frontmatter: Record<string, unknown> | null): boolean {
-  const v = frontmatter?.marp;
-  return v === true || v === "true";
 }
 
 /** Matches a leading `---\n…\n---\n` frontmatter block (same shape renderFull strips). */
@@ -236,24 +228,63 @@ function addDirPlugin(mdInstance: MarkdownIt) {
   });
 }
 
-export async function initRenderer(): Promise<void> {
+const AUTO_LANGUAGES = ["javascript", "python", "bash", "json", "yaml", "xml", "css", "sql"];
+const MAX_AUTO_LENGTH = 4096;
+const MAX_AUTO_FENCES = 24;
+const MAX_CACHE_BYTES = 512 * 1024;
+const MAX_CACHE_ENTRIES = 256;
+const highlightedFences = new Map<string, { html: string; bytes: number }>();
+let cacheBytes = 0;
+let autoFencesRemaining = 0;
+
+function highlightFence(source: string, language: string): string {
+  if (language === "mermaid") return "";
+  const explicit = language && hljs.getLanguage(language);
+  if (!explicit && source.length > MAX_AUTO_LENGTH) return "";
+
+  const key = JSON.stringify([language, source]);
+  const cached = highlightedFences.get(key);
+  if (cached) {
+    highlightedFences.delete(key);
+    highlightedFences.set(key, cached);
+    return cached.html;
+  }
+
+  if (!explicit && autoFencesRemaining <= 0) return "";
+
+  let html: string;
+  try {
+    if (explicit) {
+      html = hljs.highlight(source, { language }).value;
+    } else {
+      autoFencesRemaining--;
+      html = hljs.highlightAuto(source, AUTO_LANGUAGES).value;
+    }
+  } catch {
+    return "";
+  }
+
+  const bytes = (key.length + html.length) * 2;
+  if (bytes <= MAX_CACHE_BYTES) {
+    for (const [oldKey, old] of highlightedFences) {
+      if (cacheBytes + bytes <= MAX_CACHE_BYTES && highlightedFences.size < MAX_CACHE_ENTRIES) break;
+      cacheBytes -= old.bytes;
+      highlightedFences.delete(oldKey);
+    }
+    highlightedFences.set(key, { html, bytes });
+    cacheBytes += bytes;
+  }
+  return html;
+}
+
+export function initRenderer(): void {
   if (initialized) return;
 
   md = new MarkdownIt({
     html: false,
     linkify: true,
     typographer: true,
-    highlight: (str, lang) => {
-      if (lang && lang !== "mermaid" && hljs.getLanguage(lang)) {
-        try {
-          return hljs.highlight(str, { language: lang }).value;
-        } catch {}
-      }
-      try {
-        return hljs.highlightAuto(str).value;
-      } catch {}
-      return "";
-    },
+    highlight: highlightFence,
   });
 
   md.use(texmath, {
@@ -282,34 +313,8 @@ export function render(markdown: string, baseDir?: string): string {
 }
 
 export function renderFull(markdown: string, baseDir?: string): RenderResult {
-  if (!md) {
-    // Auto-init synchronously if not yet initialized
-    md = new MarkdownIt({
-    html: false,
-    linkify: true,
-    typographer: true,
-    highlight: (str, lang) => {
-      if (lang && lang !== "mermaid" && hljs.getLanguage(lang)) {
-        try {
-          return hljs.highlight(str, { language: lang }).value;
-        } catch {}
-      }
-      try {
-        return hljs.highlightAuto(str).value;
-      } catch {}
-      return "";
-    },
-  });
-    md.use(texmath, { engine: katex, delimiters: "dollars" });
-    md.use(taskLists, { enabled: false, label: true });
-    md.use(anchor, {
-      permalink: false,
-      slugify: (s: string) => s.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-"),
-    });
-    addSourceLinePlugin(md);
-    addDirPlugin(md);
-    initialized = true;
-  }
+  initRenderer();
+  autoFencesRemaining = MAX_AUTO_FENCES;
 
   // A leading BOM would make the first block unparseable; see stripBom (#122).
   // Dropping it cannot shift `data-source-line`, since it removes no newline.
@@ -347,7 +352,7 @@ export function renderFull(markdown: string, baseDir?: string): RenderResult {
 
   const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
 
-  const raw = md.render(content);
+  const raw = md!.render(content);
   let html = DOMPurify.sanitize(raw, {
     ADD_TAGS: [
       "pre", "code", "math", "mrow", "mi", "mo", "mn", "msup", "msub",
@@ -417,50 +422,6 @@ function resolveSrcset(srcset: string, baseDir: string, collected: string[]): st
 function isExternalSrc(src: string): boolean {
   return /^(?:https?:\/\/|data:|blob:|asset:|file:)/i.test(src);
 }
-/**
- * Resolve a local path (image src or markdown link href) against `baseDir`.
- * Decodes `%20`, passes absolute/Windows paths through, and normalizes `./`,
- * `../`, and mixed separators. Shared by image rendering and local-file links
- * (issue #30) so there's a single resolution implementation.
- */
-export function resolveLocalPath(src: string, baseDir: string): string {
-  const decodedSrc = decodeImageSrc(src);
-  if (isAbsolutePath(decodedSrc)) return decodedSrc;
-  return normalizePath(`${baseDir}/${decodedSrc}`);
-}
-
-function decodeImageSrc(src: string): string {
-  try {
-    return decodeURI(src);
-  } catch {
-    return src;
-  }
-}
-
-function isAbsolutePath(path: string): boolean {
-  return path.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(path) || path.startsWith("\\\\");
-}
-
-function normalizePath(path: string): string {
-  const isWindowsPath = /^[a-zA-Z]:[\\/]/.test(path) || path.startsWith("\\\\");
-  const separator = isWindowsPath ? "\\" : "/";
-  const normalized = path.replace(/[\\/]+/g, separator);
-  const prefix = normalized.startsWith(separator) ? separator : "";
-  const parts = normalized.split(separator);
-  const stack: string[] = [];
-
-  for (const part of parts) {
-    if (!part || part === ".") continue;
-    if (part === ".." && stack.length > 0 && stack[stack.length - 1] !== "..") {
-      stack.pop();
-    } else if (part !== ".." || !prefix) {
-      stack.push(part);
-    }
-  }
-
-  return `${prefix}${stack.join(separator)}`;
-}
-
 export function isInitialized(): boolean {
   return initialized;
 }

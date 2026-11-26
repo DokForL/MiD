@@ -25,3 +25,19 @@ describe("plain-text code fences", () => {
     expect(html).toContain("hljs-string");
   });
 });
+
+describe("code fence autodetection budget", () => {
+  it("leaves long unlabelled fences escaped and preserves explicit highlighting", () => {
+    const source = "const example = '<tag>'; // " + "x".repeat(4096);
+    expect(render(`\`\`\`\n${source}\n\`\`\``)).toContain("&lt;tag&gt;");
+    expect(render(`\`\`\`\n${source}\n\`\`\``)).not.toContain("hljs-");
+    expect(render(`\`\`\`javascript\n${source}\n\`\`\``)).toContain("hljs-string");
+  });
+
+  it("bounds new guesses per document while reusing repeated fences", () => {
+    const fence = (n: number) => `\`\`\`\nconst marker${n} = "sample";\n\`\`\`\n`;
+    const html = render(Array.from({ length: 30 }, (_, i) => fence(i + 400)).join("\n") + "\n" + fence(400));
+    expect(html).toMatch(/<pre><code>const marker429 = &quot;sample&quot;/);
+    expect(html).not.toContain("<pre><code>const marker400");
+  });
+});

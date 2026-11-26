@@ -4,7 +4,6 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { document } from "../stores/document";
 import { tabStore } from "../stores/tabs";
-import { renderFull } from "../renderer/pipeline";
 import { addRecentFile } from "../stores/recents";
 import { pinnedFolders } from "../stores/pinned";
 import { basename } from "../utils/path";
@@ -18,29 +17,41 @@ export async function saveFile(path: string, content: string): Promise<void> {
   await invoke("write_markdown_file", { path, content });
 }
 
-export async function openFile(path: string): Promise<void> {
-  const absolutePath = await resolvePath(path);
-  const fileName = basename(absolutePath);
-  const baseDir = getBaseDir(absolutePath);
+let latestOpen = 0;
 
-  document.set({
-    filePath: absolutePath,
-    fileName,
-    content: "",
-    renderedHtml: "",
-    frontmatter: null,
-    wordCount: 0,
-    loading: true,
-    error: null,
-  });
-
+export async function openFile(path: string, pendingTabId?: string): Promise<void> {
+  const request = ++latestOpen;
+  const isCurrent = () => request === latestOpen
+    && (!pendingTabId || tabStore.getActiveTab()?.id === pendingTabId);
+  let absolutePath = path;
+  let fileName = basename(path);
   try {
-    const content = await readMarkdownFile(absolutePath);
-    const result = renderFull(content, baseDir);
+    absolutePath = await resolvePath(path);
+    fileName = basename(absolutePath);
+    if (!isCurrent()) return;
+    document.set({
+      filePath: absolutePath,
+      fileName,
+      content: "",
+      renderedHtml: "",
+      frontmatter: null,
+      wordCount: 0,
+      loading: true,
+      error: null,
+    });
+
+    const [content, { renderFull }] = await Promise.all([
+      readMarkdownFile(absolutePath),
+      import("../renderer/pipeline"),
+    ]);
+    if (!isCurrent()) return;
+    const result = renderFull(content, getBaseDir(absolutePath));
+    if (!isCurrent()) return;
 
     // Whitelist the document's local images with the asset protocol before the
     // HTML hits the DOM, so images outside the static $HOME scope load (#31).
     await allowAssets(result.assetPaths, absolutePath);
+    if (!isCurrent()) return;
 
     const tabId = tabStore.addTab(absolutePath, fileName, content, result.html, result.frontmatter, result.wordCount);
     watchFile(absolutePath);
@@ -63,6 +74,7 @@ export async function openFile(path: string): Promise<void> {
     addRecentFile(absolutePath, fileName);
     getCurrentWindow().setTitle(`${fileName} — MiD`).catch(() => {});
   } catch (err) {
+    if (!isCurrent()) return;
     document.set({
       filePath: absolutePath,
       fileName,
@@ -87,14 +99,13 @@ let newDocCounter = 0;
  */
 export function newDocument(): void {
   const filePath = `new://${Date.now()}-${newDocCounter++}`;
-  const result = renderFull("");
   const tabId = tabStore.addTab(
     filePath,
     translate("files.untitled"),
     "",
-    result.html,
-    result.frontmatter,
-    result.wordCount
+    "",
+    null,
+    0
   );
   tabStore.setEditing(tabId, true);
 }
@@ -159,6 +170,7 @@ export async function reloadFile(path: string): Promise<void> {
     const absolutePath = await resolvePath(path);
     const content = await readMarkdownFile(absolutePath);
     const baseDir = getBaseDir(absolutePath);
+    const { renderFull } = await import("../renderer/pipeline");
     const result = renderFull(content, baseDir);
     const fileName = basename(absolutePath);
 

@@ -2,7 +2,7 @@
   import { onMount, tick } from "svelte";
   import { document as docStore } from "$lib/stores/document";
   import { tabStore, HOME_TAB_ID, type Tab } from "$lib/stores/tabs";
-  import { initRenderer, renderFull, resolveLocalPath, isMarpDoc } from "$lib/renderer/pipeline";
+  import { resolveLocalPath, isMarpDoc } from "$lib/renderer/document-info";
   import {
     allowAssets,
     getBaseDir,
@@ -33,12 +33,7 @@
   import TableOfContents from "$lib/components/TableOfContents.svelte";
   import TabBar from "$lib/components/TabBar.svelte";
   import SearchOverlay from "$lib/components/SearchOverlay.svelte";
-  import PasteModal from "$lib/components/PasteModal.svelte";
-  import OpenDialog from "$lib/components/OpenDialog.svelte";
-  import SettingsDialog from "$lib/components/SettingsDialog.svelte";
   import LanguageDialog from "$lib/components/LanguageDialog.svelte";
-  import AboutDialog from "$lib/components/AboutDialog.svelte";
-  import CustomPromptModal from "$lib/components/CustomPromptModal.svelte";
   import { assembleUrlByIds, consumePendingSelection } from "$lib/stores/aiLookup";
   import FrontmatterBar from "$lib/components/FrontmatterBar.svelte";
   import StatusBar from "$lib/components/StatusBar.svelte";
@@ -48,7 +43,6 @@
   import UpdateToast from "$lib/components/UpdateToast.svelte";
   import Toast from "$lib/components/Toast.svelte";
   import Editor from "$lib/components/Editor.svelte";
-  import PresentationView from "$lib/components/PresentationView.svelte";
   import { updateScrollPercent } from "$lib/stores/recents";
   import { checkForUpdates, updateAvailable, updateDismissed, checkInFlight } from "$lib/stores/updater";
   import { get } from "svelte/store";
@@ -59,7 +53,6 @@
   import { chromeTop, sideTabsWidth, SIDE_TABS_CHROME, TOP_TABS_CHROME } from "$lib/utils/layout";
   import { saveProgress, getProgress } from "$lib/stores/readingProgress";
 
-  let rendererReady = $state(false);
   let searchVisible = $state(false);
   let pasteVisible = $state(false);
   let pasteDefaultMode = $state<"paste" | "url">("paste");
@@ -76,8 +69,7 @@
   // are "editing" states (activeTab.isEditing true); splitMode just adds the
   // preview pane, so save / dirty / editContent all keep working unchanged.
   let splitMode = $state(false);
-  let splitPreviewHtml = $state("");
-  let splitPreviewTimer: ReturnType<typeof setTimeout> | undefined;
+  let splitPreview = $state<{ tabId: string; html: string } | null>(null);
   let contentMaxWidth = $derived(getContentMaxWidth($settings));
 
   // Raw-view line numbers (#110). Same gutter treatment as the editor, driven by
@@ -183,6 +175,7 @@
   let activeTab = $derived<Tab | null>($tabs.find((t) => t.id === $activeTabId) ?? null);
   let canEditActive = $derived(
     !!activeTab?.filePath
+    && !activeTab.pending
     && !activeTab.filePath.startsWith("paste://")
     && !activeTab.filePath.startsWith("url://")
   );
@@ -217,18 +210,29 @@
   // for typical docs — add incremental rendering only if a huge file lags.
   $effect(() => {
     if (!splitMode || !activeTab?.isEditing) return;
-    const content = activeTab.editContent;
-    const baseDir = getBaseDir(activeTab.filePath);
-    clearTimeout(splitPreviewTimer);
-    splitPreviewTimer = setTimeout(() => {
-      const result = renderFull(content, baseDir);
-      allowAssets(result.assetPaths, activeTab.filePath);
-      splitPreviewHtml = result.html;
-      // The re-render replaced the preview's blocks; put it back where the
-      // editor is so typing never leaves the two panes on different sections.
-      tick().then(() => splitSync?.syncFromEditor());
+    const { editContent: content, filePath, id } = activeTab;
+    const baseDir = getBaseDir(filePath);
+    let stale = false;
+    const isCurrent = () => !stale && splitMode && activeTab?.id === id
+      && activeTab.editContent === content;
+    const timer = setTimeout(async () => {
+      try {
+        const { renderFull } = await import("$lib/renderer/pipeline");
+        if (!isCurrent()) return;
+        const result = renderFull(content, baseDir);
+        await allowAssets(result.assetPaths, filePath);
+        if (!isCurrent()) return;
+        splitPreview = { tabId: id, html: result.html };
+        await tick();
+        if (isCurrent()) splitSync?.syncFromEditor();
+      } catch (error) {
+        if (isCurrent()) console.error("Could not update split preview:", error);
+      }
     }, 120);
-    return () => clearTimeout(splitPreviewTimer);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
   });
 
   // Split-mode scroll sync (#74): editor and preview follow each other. Keyed
@@ -278,7 +282,7 @@
    * Switch view mode while preserving the source-line position so the user
    * stays anchored at the same place in the document.
    */
-  function switchMode(target: ViewMode) {
+  async function switchMode(target: ViewMode) {
     if (!activeTab || target === currentMode) return;
     if (target === "editor" && !canEditActive) return;
 
@@ -301,6 +305,9 @@
       // continues to mark that the changes aren't on disk yet.
       if (activeTab.isEditing && activeTab.dirty) {
         const baseDir = getBaseDir(activeTab.filePath);
+        const tabId = activeTab.id;
+        const { renderFull } = await import("$lib/renderer/pipeline");
+        if (activeTab?.id !== tabId || !activeTab.isEditing) return;
         const result = renderFull(activeTab.editContent, baseDir);
         // Fire-and-forget: referenced images were almost always allowed at open;
         // a brand-new external image typed mid-edit self-heals on the next
@@ -364,6 +371,7 @@
         await saveFile(tab.filePath, tab.editContent);
       }
       const baseDir = getBaseDir(targetPath);
+      const { renderFull } = await import("$lib/renderer/pipeline");
       const result = renderFull(tab.editContent, baseDir);
       await allowAssets(result.assetPaths, targetPath);
       tabStore.markSaved(tab.id);
@@ -530,7 +538,7 @@
     // closed.
     const watchedPath = $tabs.find((x) => x.id === id)?.filePath ?? t.filePath;
     tabStore.closeTab(id);
-    unwatchFile(watchedPath);
+    if (!t.pending) unwatchFile(watchedPath);
     return true;
   }
 
@@ -590,9 +598,6 @@
   }
 
   onMount(() => {
-    initRenderer();
-    rendererReady = true;
-
     // First run: ask for a language. The picker highlights the OS-detected
     // one (English when the OS language isn't supported); choosing or
     // dismissing stores a choice, so it only ever appears once.
@@ -601,7 +606,7 @@
     // Expose functions for native menu and OS file-open handlers
     (window as any).__mid_open_file = () => { openVisible = true; };
     (window as any).__mid_open_path = (path: string) => {
-      if (path && rendererReady) {
+      if (path) {
         openFile(path);
       }
     };
@@ -722,36 +727,17 @@
     void initFileWatcher();
 
     void (async () => {
-      // Bring back last run's tabs first (#72), so a file opened via "Open
-      // With" or the CLI below lands on top of them as the active tab.
-      if ($settings.restoreTabsOnLaunch) {
-        try {
-          await restoreSession();
-        } catch {}
-      }
-
-      // Check for files opened via "Open With" / double-click (buffered in Rust state)
-      try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const openedFiles = await invoke<string[]>("get_opened_files");
-        if (openedFiles.length > 0) {
-          await openFile(openedFiles[0]);
-        }
-      } catch {}
-
-      // Check for updates (non-blocking, skips in dev)
-      checkForUpdates();
-
-      // Check for CLI file argument
-      try {
-        const { getMatches } = await import("@tauri-apps/plugin-cli");
-        const matches = await getMatches();
-        if (matches.args?.file?.value) {
-          await openFile(matches.args.file.value as string);
-        }
-      } catch {
-        // CLI plugin may not be available in dev
-      }
+      const [openedFiles, cliPath] = await Promise.all([
+        invoke<string[]>("get_opened_files").catch(() => []),
+        import("@tauri-apps/plugin-cli")
+          .then(({ getMatches }) => getMatches())
+          .then((matches) => matches.args?.file?.value)
+          .catch(() => undefined),
+      ]);
+      const requested = typeof cliPath === "string" && cliPath ? cliPath : openedFiles[0];
+      if (requested) await openFile(requested);
+      if ($settings.restoreTabsOnLaunch) await restoreSession(!requested);
+      void checkForUpdates();
     })();
 
     return () => {
@@ -1105,20 +1091,23 @@
 
   // Sync tab switching with document store — only reads $activeTabId and $tabs
   let prevTabId: string | null = null;
+  let prevTabPending = false;
 
   $effect(() => {
     const id = $activeTabId;
     const allTabs = $tabs;
 
-    // Skip if same tab
-    if (id === prevTabId) return;
+    const tab = allTabs.find((entry) => entry.id === id);
+    const pending = !!tab?.pending;
+    const switched = id !== prevTabId;
+    if (!switched && pending === prevTabPending) return;
 
     // Save reading progress for the tab we're leaving.
     // At this point in the $effect, $activeTabId has changed but the DOM still
     // shows the previous tab's content (docStore.set happens below), so
     // getCurrentSourceLine reads the correct article elements. We flush the
     // debounce to ensure nothing is lost on rapid tab switches.
-    if (prevTabId && prevTabId !== HOME_TAB_ID) {
+    if (switched && prevTabId && prevTabId !== HOME_TAB_ID && !prevTabPending) {
       const prevTab = allTabs.find((t) => t.id === prevTabId);
       if (prevTab && !prevTab.isEditing && !prevTab.filePath.startsWith("paste://")) {
         clearTimeout(scrollSaveTimer);
@@ -1130,6 +1119,7 @@
     }
 
     prevTabId = id;
+    prevTabPending = pending;
 
     if (!id || id === HOME_TAB_ID) {
       rawMode = false;
@@ -1151,8 +1141,11 @@
       return;
     }
 
-    const tab = allTabs.find((t) => t.id === id);
     if (!tab) return;
+    if (tab.pending) {
+      void openFile(tab.filePath, tab.id);
+      return;
+    }
 
     docStore.set({
       filePath: tab.filePath,
@@ -1174,6 +1167,7 @@
     const savedScroll = tab.scrollTop;
     tick().then(() => {
       requestAnimationFrame(() => {
+        if (get(activeTabId) !== id) return;
         window.scrollTo(0, savedScroll);
         // Restore reading progress (smooth-scroll to saved source line)
         // Only if the tab is at scroll 0 (freshly opened or re-opened)
@@ -1213,19 +1207,35 @@
     <TableOfContents />
   {/if}
   <SearchOverlay bind:visible={searchVisible} />
-  <PasteModal bind:visible={pasteVisible} defaultMode={pasteDefaultMode} />
-  <OpenDialog bind:visible={openVisible} />
-  <SettingsDialog bind:visible={settingsVisible} />
+  {#if pasteVisible}
+    {#await import("$lib/components/PasteModal.svelte") then { default: PasteModal }}
+      <PasteModal bind:visible={pasteVisible} defaultMode={pasteDefaultMode} />
+    {/await}
+  {/if}
+  {#if openVisible}
+    {#await import("$lib/components/OpenDialog.svelte") then { default: OpenDialog }}
+      <OpenDialog bind:visible={openVisible} />
+    {/await}
+  {/if}
+  {#if settingsVisible}
+    {#await import("$lib/components/SettingsDialog.svelte") then { default: SettingsDialog }}
+      <SettingsDialog bind:visible={settingsVisible} />
+    {/await}
+  {/if}
   <LanguageDialog bind:visible={languageVisible} />
-  <AboutDialog bind:visible={aboutVisible} />
-  <CustomPromptModal bind:visible={customPromptVisible} selection={customPromptSelection} />
+  {#if aboutVisible}
+    {#await import("$lib/components/AboutDialog.svelte") then { default: AboutDialog }}
+      <AboutDialog bind:visible={aboutVisible} />
+    {/await}
+  {/if}
+  {#if customPromptVisible}
+    {#await import("$lib/components/CustomPromptModal.svelte") then { default: CustomPromptModal }}
+      <CustomPromptModal bind:visible={customPromptVisible} selection={customPromptSelection} />
+    {/await}
+  {/if}
 
   <div class="doc-area">
-  {#if !rendererReady}
-    <div class="state-center">
-      <p class="state-text pulse">{$t('page.loadingRenderer')}</p>
-    </div>
-  {:else if $docStore.loading}
+  {#if $docStore.loading}
     <div class="state-center">
       <p class="state-text pulse">{$t('page.openingFile')}</p>
     </div>
@@ -1241,6 +1251,7 @@
          and gating on that dropped the user back to the home/recents view with no
          way to edit (#52). A real (even empty) file tab always shows here. -->
     {#if presenting && activeIsMarp}
+      {#await import("$lib/components/PresentationView.svelte") then { default: PresentationView }}
       <PresentationView
         content={$docStore.content}
         baseDir={activeTab ? getBaseDir(activeTab.filePath) : ""}
@@ -1248,6 +1259,7 @@
         onExit={() => (presenting = false)}
         onLocalLink={handleLocalLink}
       />
+      {/await}
     {:else if activeTab?.isEditing && splitMode}
       <!-- Split (#19): editor left, live preview right. Both panes are fixed
            half-width; the Editor's own fixed positioning takes the `split` prop
@@ -1269,7 +1281,7 @@
       {/key}
       <main class="split-preview">
         <MarkdownRenderer
-          html={splitPreviewHtml}
+          html={splitPreview?.tabId === activeTab.id ? splitPreview.html : ""}
           onImageClick={(src, all, idx) => { lightboxImages = all; lightboxIndex = idx; lightboxVisible = true; }}
           onLocalLink={handleLocalLink}
         />

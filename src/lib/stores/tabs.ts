@@ -6,6 +6,7 @@ export interface Tab {
   fileName: string;
   content: string;
   renderedHtml: string;
+  pending?: true;
   frontmatter: Record<string, unknown> | null;
   wordCount: number;
   scrollTop: number;
@@ -107,9 +108,9 @@ function createTabStore() {
           // Preserve edit state on re-add — only refresh content/render if not dirty
           if (t.isEditing) {
             const dirty = t.editContent !== content;
-            return { ...t, content, renderedHtml, frontmatter: frontmatter ?? null, wordCount: wordCount ?? 0, dirty };
+            return { ...t, pending: undefined, content, renderedHtml, frontmatter: frontmatter ?? null, wordCount: wordCount ?? 0, dirty };
           }
-          return { ...t, content, renderedHtml, frontmatter: frontmatter ?? null, wordCount: wordCount ?? 0, editContent: content, dirty: false };
+          return { ...t, pending: undefined, content, renderedHtml, frontmatter: frontmatter ?? null, wordCount: wordCount ?? 0, editContent: content, dirty: false };
         })
       );
       return existing.id;
@@ -135,6 +136,24 @@ function createTabStore() {
     tabs.update((ts) => [...ts, newTab]);
     activeTabId.set(id);
     return id;
+  }
+
+  function restorePlaceholders(files: { filePath: string; fileName: string }[]): Tab[] {
+    const current = get(tabs);
+    const byPath = new Map(current.map((tab) => [tab.filePath, tab]));
+    const restored: Tab[] = [];
+    for (const { filePath, fileName } of files) {
+      const existing = byPath.get(filePath);
+      restored.push(existing ?? {
+        id: generateId(), filePath, fileName, content: "", renderedHtml: "",
+        frontmatter: null, wordCount: 0, scrollTop: 0, isEditing: false,
+        editContent: "", dirty: false, lastSavedAt: 0, diskChanged: false,
+        pending: true,
+      });
+    }
+    const restoredPaths = new Set(restored.map((tab) => tab.filePath));
+    tabs.set([...restored, ...current.filter((tab) => !restoredPaths.has(tab.filePath))]);
+    return restored;
   }
 
   function closeTab(id: string) {
@@ -283,6 +302,7 @@ function createTabStore() {
     rebindPath,
     saveScrollPosition,
     getSavedSession,
+    restorePlaceholders,
   };
 }
 
