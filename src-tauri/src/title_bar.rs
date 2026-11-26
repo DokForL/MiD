@@ -28,8 +28,17 @@ pub fn install(window: &WebviewWindow) -> Result<(), Box<dyn std::error::Error>>
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
     }
-    gtk_window.set_titlebar(Some(&header));
-    header.show();
+    // Give the title bar its own input region. Interactive children keep their
+    // event windows above it so GTK can still handle menu and button clicks.
+    let drag_area = gtk::EventBox::builder().visible_window(false).build();
+    drag_area.add_events(
+        gtk::gdk::EventMask::BUTTON_PRESS_MASK
+            | gtk::gdk::EventMask::BUTTON_RELEASE_MASK
+            | gtk::gdk::EventMask::BUTTON_MOTION_MASK,
+    );
+    drag_area.add(&header);
+    gtk_window.set_titlebar(Some(&drag_area));
+    drag_area.show_all();
     Ok(())
 }
 
@@ -63,12 +72,13 @@ pub fn set_theme(window: &WebviewWindow, dark: bool) -> tauri::Result<()> {
 }
 
 fn header(window: &WebviewWindow) -> Option<gtk::HeaderBar> {
-    let header = window
+    let drag_area = window
         .gtk_window()
         .ok()?
         .titlebar()?
-        .downcast::<gtk::HeaderBar>()
+        .downcast::<gtk::EventBox>()
         .ok()?;
+    let header = drag_area.child()?.downcast::<gtk::HeaderBar>().ok()?;
     header
         .style_context()
         .has_class(STYLE_CLASS)
