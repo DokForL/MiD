@@ -50,6 +50,10 @@ pub fn attach_menu(app: &AppHandle) -> tauri::Result<()> {
             if let (Some(header), Ok(content)) = (header(&main), main.default_vbox()) {
                 for child in content.children() {
                     if let Ok(menu) = child.downcast::<gtk::MenuBar>() {
+                        connect_menu_drag(&menu, &menu, &header);
+                        for_each_submenu(&menu, &mut |popup| {
+                            connect_menu_drag(popup, &menu, &header)
+                        });
                         style_submenus(&menu, header.style_context().has_class("dark"));
                         content.remove(&menu);
                         header.pack_start(&menu);
@@ -89,6 +93,74 @@ fn header(window: &WebviewWindow) -> Option<gtk::HeaderBar> {
         .style_context()
         .has_class(STYLE_CLASS)
         .then_some(header)
+}
+
+fn connect_menu_drag(
+    receiver: &impl IsA<gtk::Widget>,
+    menu: &gtk::MenuBar,
+    header: &gtk::HeaderBar,
+) {
+    let menu = menu.downgrade();
+    let header = header.downgrade();
+    receiver.connect_button_press_event(move |_, event| {
+        let proceed = gtk::glib::Propagation::Proceed;
+        let (Some(menu), Some(header), Some(device)) =
+            (menu.upgrade(), header.upgrade(), event.device())
+        else {
+            return proceed;
+        };
+        if event.button() != 1 || event.event_type() != gtk::gdk::EventType::ButtonPress {
+            return proceed;
+        }
+
+        let Some(window) = header.toplevel().and_downcast::<gtk::Window>() else {
+            return proceed;
+        };
+        let Some(surface) = window.window() else {
+            return proceed;
+        };
+        let (root_x, root_y) = event.root();
+        let (window_x, window_y) = surface.root_coords(0, 0);
+        let x = root_x as i32 - window_x;
+        let y = root_y as i32 - window_y;
+        if !contains_point(header.upcast_ref(), &window, x, y)
+            || hits_control(header.upcast_ref(), &window, x, y)
+        {
+            return proceed;
+        }
+
+        // Wayland requires the serial from this press. Release the menu grab
+        // and start the move while the same button is still held down.
+        menu.cancel();
+        surface.begin_move_drag_for_device(&device, 1, root_x as i32, root_y as i32, event.time());
+        gtk::glib::Propagation::Stop
+    });
+}
+
+fn contains_point(widget: &gtk::Widget, window: &gtk::Window, x: i32, y: i32) -> bool {
+    widget.is_visible()
+        && widget
+            .translate_coordinates(window, 0, 0)
+            .is_some_and(|(left, top)| {
+                x >= left
+                    && x < left + widget.allocated_width()
+                    && y >= top
+                    && y < top + widget.allocated_height()
+            })
+}
+
+fn hits_control(widget: &gtk::Widget, window: &gtk::Window, x: i32, y: i32) -> bool {
+    if !contains_point(widget, window, x, y) {
+        return false;
+    }
+    if widget.is::<gtk::Button>() || widget.is::<gtk::MenuBar>() {
+        return true;
+    }
+    let mut hit = false;
+    if let Some(container) = widget.downcast_ref::<gtk::Container>() {
+        container.forall(|child| hit |= hits_control(child, window, x, y));
+    }
+    hit
 }
 
 fn style_submenus(container: &impl IsA<gtk::Container>, dark: bool) {
