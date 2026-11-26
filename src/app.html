@@ -5,6 +5,20 @@
     <link rel="icon" href="%sveltekit.assets%/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MiD</title>
+    <script src="%sveltekit.assets%/theme-init.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        background-color: #fafafa;
+        color: #1c1c1e;
+      }
+
+      :root.dark {
+        color-scheme: dark;
+        background-color: #161618;
+        color: #e5e5e7;
+      }
+    </style>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

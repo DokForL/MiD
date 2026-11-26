@@ -5,8 +5,21 @@ mod title_bar;
 mod single_window;
 mod watcher;
 
-use std::sync::Mutex;
+use std::sync::{atomic::{AtomicBool, Ordering}, Mutex};
 use tauri::Manager;
+
+struct StartupWindow(AtomicBool);
+
+fn show_startup_window(window: &tauri::WebviewWindow, dark: Option<bool>) -> tauri::Result<()> {
+    if window.label() != "main" || !window.state::<StartupWindow>().0.swap(false, Ordering::AcqRel) {
+        return Ok(());
+    }
+
+    let dark = dark.unwrap_or_else(|| window.theme().ok() == Some(tauri::Theme::Dark));
+    let (red, green, blue) = if dark { (22, 22, 24) } else { (250, 250, 250) };
+    let _ = window.set_background_color(Some(tauri::webview::Color(red, green, blue, 255)));
+    window.show()
+}
 
 /// Stores file paths received from OS "Open With" events.
 /// These arrive before the webview is ready, so we buffer them.
@@ -95,17 +108,14 @@ fn parse_mid_url(url: &tauri::Url) -> Option<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let context = tauri::generate_context!();
-    #[cfg(target_os = "linux")]
-    let mut context = context;
-    #[cfg(target_os = "linux")]
+    let mut context = tauri::generate_context!();
     let defer_main_window = {
         let main_window = context
             .config_mut()
             .app
             .windows
             .iter_mut()
-            .find(|window| window.label == "main" && window.visible && window.decorations);
+            .find(|window| window.label == "main" && window.visible);
         if let Some(window) = main_window {
             window.visible = false;
             true
@@ -129,8 +139,14 @@ pub fn run() {
         builder
     };
 
+    use tauri_plugin_window_state::StateFlags;
     builder
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .manage(StartupWindow(AtomicBool::new(defer_main_window)))
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(StateFlags::all() - StateFlags::VISIBLE)
+                .build(),
+        )
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
@@ -162,7 +178,6 @@ pub fn run() {
             if defer_main_window {
                 if let Some(window) = app.get_webview_window("main") {
                     title_bar::install(&window)?;
-                    window.show()?;
                 }
             }
 
@@ -178,6 +193,17 @@ pub fn run() {
             // quit_app (AppHandle::exit) is a hard exit that bypasses this, so a
             // confirmed quit can't loop back here.
             if let Some(main_window) = app.get_webview_window("main") {
+                if defer_main_window {
+                    // Keep the window accessible if frontend startup fails.
+                    let fallback = main_window.clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_secs(5));
+                        let window = fallback.clone();
+                        let _ = fallback.run_on_main_thread(move || {
+                            let _ = show_startup_window(&window, None);
+                        });
+                    });
+                }
                 let quit_win = main_window.clone();
                 main_window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {

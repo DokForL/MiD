@@ -14,6 +14,10 @@ pub fn install(window: &WebviewWindow) -> Result<(), Box<dyn std::error::Error>>
         .show_close_button(true)
         .build();
     header.style_context().add_class(STYLE_CLASS);
+    let dark = gtk_window
+        .settings()
+        .is_some_and(|settings| settings.is_gtk_application_prefer_dark_theme());
+    set_dark_class(&header.style_context(), dark);
     gtk_window
         .bind_property("title", &header, "title")
         .sync_create()

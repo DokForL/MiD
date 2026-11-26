@@ -219,7 +219,8 @@ pub fn set_menu_language(app: tauri::AppHandle, labels: MenuLabels) -> Result<()
 pub fn set_title_bar_theme(window: tauri::WebviewWindow, dark: bool) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     crate::title_bar::set_theme(&window, dark).map_err(|e| e.to_string())?;
-    #[cfg(not(target_os = "linux"))]
-    let _ = (window, dark);
-    Ok(())
+    let main = window.clone();
+    window.run_on_main_thread(move || {
+        let _ = crate::show_startup_window(&main, Some(dark));
+    }).map_err(|e| e.to_string())
 }

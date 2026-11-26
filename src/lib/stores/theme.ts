@@ -3,7 +3,10 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 
 export type ThemeMode = "light" | "dark" | "system";
 
-export const themeMode = writable<ThemeMode>("system");
+const initialMode = globalThis.document?.documentElement.dataset.themeMode;
+export const themeMode = writable<ThemeMode>(
+  initialMode === "light" || initialMode === "dark" ? initialMode : "system",
+);
 
 function getSystemTheme(): "light" | "dark" {
   if (typeof window === "undefined") return "light";
@@ -33,20 +36,22 @@ export function applyCurrentTheme(): void {
   }
 }
 
-export function initThemeListener(): void {
-  // Apply on init
-  applyCurrentTheme();
-
-  // Listen for OS theme changes
+export function initThemeListener(): () => void {
   const mq = window.matchMedia("(prefers-color-scheme: dark)");
-  mq.addEventListener("change", () => {
+  mq.addEventListener("change", applyCurrentTheme);
+  const unsubscribe = themeMode.subscribe((mode) => {
+    try {
+      localStorage.setItem("mid-theme", mode);
+    } catch {
+      // Keep theme switching usable when storage is unavailable.
+    }
     applyCurrentTheme();
   });
 
-  // Listen for store changes
-  themeMode.subscribe(() => {
-    applyCurrentTheme();
-  });
+  return () => {
+    unsubscribe();
+    mq.removeEventListener("change", applyCurrentTheme);
+  };
 }
 
 export function cycleTheme(current: ThemeMode): ThemeMode {

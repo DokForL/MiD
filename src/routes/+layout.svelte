@@ -1,12 +1,16 @@
 <script lang="ts">
   import "../app.css";
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { initThemeListener } from "$lib/stores/theme";
   // Runs locale detection and sets <html lang> before the first render.
   import "$lib/i18n";
 
   onMount(() => {
-    initThemeListener();
+    let stopThemeListener: (() => void) | undefined;
+    let destroyed = false;
+    void tick().then(() => {
+      if (!destroyed) stopThemeListener = initThemeListener();
+    });
 
     const root = document.documentElement;
     let resizeEnd: number | undefined;
@@ -23,6 +27,8 @@
     }
     window.addEventListener("resize", handleResize);
     return () => {
+      destroyed = true;
+      stopThemeListener?.();
       window.removeEventListener("resize", handleResize);
       window.clearTimeout(resizeEnd);
       root.classList.remove("viewport-resizing");

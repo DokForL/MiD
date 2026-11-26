@@ -26,16 +26,6 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-html {
-  background-color: #fafafa;
-  color: #1c1c1e;
-}
-
-html.dark {
-  background-color: #161618;
-  color: #e5e5e7;
-}
-
 /* Hide scrollbars on startup while preserving scroll input. */
 html:not([data-show-scrollbars]),
 html:not([data-show-scrollbars]) * {

@@ -93,6 +93,9 @@ pub fn on_second_instance(app: &AppHandle, argv: Vec<String>, cwd: String) {
     crate::deliver_opened_files(app, file_args(&argv, &cwd));
 
     if let Some(window) = app.get_webview_window("main") {
+        if app.state::<crate::StartupWindow>().0.load(std::sync::atomic::Ordering::Acquire) {
+            return;
+        }
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
