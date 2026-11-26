@@ -34,6 +34,7 @@
   }
 
   let articleEl: HTMLElement | undefined = $state();
+  let paintsSelection = $state(false);
   let observer: IntersectionObserver | undefined;
   let lastMermaidTheme = "";
   let tooltipEl: HTMLDivElement | undefined;
@@ -173,7 +174,35 @@
 
   onMount(() => {
     articleEl?.addEventListener("contextmenu", handleContextMenu);
+    const highlights = CSS.highlights;
+    const highlightName = "md-text-selection";
+    let paintedHighlight: Highlight | undefined;
+    function clearSelectionHighlight() {
+      if (paintedHighlight && highlights.get(highlightName) === paintedHighlight) {
+        highlights.delete(highlightName);
+      }
+      paintedHighlight = undefined;
+    }
+    function updateSelectionHighlight() {
+      const selection = document.getSelection();
+      paintsSelection = false;
+      clearSelectionHighlight();
+      if (!articleEl || !selection || selection.isCollapsed || !selection.rangeCount) return;
+
+      const range = selection.getRangeAt(0);
+      if (!articleEl.contains(range.commonAncestorContainer)) return;
+
+      // Paint the glyph ranges instead of WebKit's block-wide selection gaps.
+      paintedHighlight = new Highlight(range.cloneRange());
+      highlights.set(highlightName, paintedHighlight);
+      paintsSelection = true;
+    }
+    if (highlights && typeof Highlight === "function") {
+      document.addEventListener("selectionchange", updateSelectionHighlight);
+    }
     return () => {
+      document.removeEventListener("selectionchange", updateSelectionHighlight);
+      clearSelectionHighlight();
       articleEl?.removeEventListener("contextmenu", handleContextMenu);
       observer?.disconnect();
       // Remove the body-level tooltip so it can't outlive the component.
@@ -332,6 +361,7 @@
   bind:this={articleEl}
   class="md-content prose prose-slate dark:prose-invert max-w-none mx-auto px-8 py-8 transition-all"
   class:wrap-code={$settings.wrapCodeBlocks}
+  class:paints-selection={paintsSelection}
   style="
     max-width: {getContentMaxWidth($settings)};
     font-size: {$settings.fontSize}px;
@@ -343,6 +373,16 @@
 </article>
 
 <style>
+  :global(html:has(.paints-selection) ::selection) {
+    background: transparent;
+    color: inherit;
+  }
+
+  :global(::highlight(md-text-selection)) {
+    background-color: #176bc4;
+    color: white;
+  }
+
   .md-content {
     color: #1c1c1e;
   }
