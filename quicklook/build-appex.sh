@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Builds MDHeroQuickLook.appex, the macOS Quick Look preview extension.
+# Builds MiDQuickLook.appex, the macOS Quick Look preview extension.
 #
 # It must run BEFORE `tauri build`, because Tauri copies the finished .appex into
 # the app bundle and then seals it inside the app's signature. Tauri does not
@@ -15,7 +15,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$ROOT/quicklook/build"
-APPEX="$OUT/MDHeroQuickLook.appex"
+APPEX="$OUT/MiDQuickLook.appex"
 IDENTITY="${APPLE_SIGNING_IDENTITY:--}"
 
 VERSION="$(node -p "require('$ROOT/package.json').version")"
@@ -34,12 +34,12 @@ for arch in arm64 x86_64; do
     -emit-executable \
     -Xlinker -e -Xlinker _NSExtensionMain \
     -O \
-    -o "$OUT/MDHeroQuickLook-$arch" \
+    -o "$OUT/MiDQuickLook-$arch" \
     "$ROOT/quicklook/Preview.swift"
 done
-lipo -create -output "$APPEX/Contents/MacOS/MDHeroQuickLook" \
-  "$OUT/MDHeroQuickLook-arm64" "$OUT/MDHeroQuickLook-x86_64"
-rm -f "$OUT/MDHeroQuickLook-arm64" "$OUT/MDHeroQuickLook-x86_64"
+lipo -create -output "$APPEX/Contents/MacOS/MiDQuickLook" \
+  "$OUT/MiDQuickLook-arm64" "$OUT/MiDQuickLook-x86_64"
+rm -f "$OUT/MiDQuickLook-arm64" "$OUT/MiDQuickLook-x86_64"
 
 echo "==> Assembling the bundle"
 # PlistBuddy rather than sed: the version comes from package.json, and a `/` in
@@ -59,7 +59,7 @@ plutil -lint "$APPEX/Contents/Info.plist" > /dev/null
 echo "==> Signing the extension"
 codesign --force --sign "$IDENTITY" \
   --options runtime \
-  --entitlements "$ROOT/quicklook/MDHeroQuickLook.entitlements" \
+  --entitlements "$ROOT/quicklook/MiDQuickLook.entitlements" \
   "$APPEX"
 codesign --verify --deep --strict "$APPEX"
 

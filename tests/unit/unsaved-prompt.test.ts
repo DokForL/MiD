@@ -153,8 +153,8 @@ describe("the unsaved-changes call sites", () => {
   });
 
   it("aborts the quit when a save is cancelled, instead of quitting anyway", () => {
-    const start = page.indexOf("__mdhero_quit");
-    const body = page.slice(start, page.indexOf("__mdhero_check_updates", start));
+    const start = page.indexOf("__mid_quit");
+    const body = page.slice(start, page.indexOf("__mid_check_updates", start));
     expect(body).toContain("if (!(await handleSave(t))) return;");
     // The old code had a `catch {}` around the dialog that fell through to
     // quit_app, so a dialog failure lost the same work.

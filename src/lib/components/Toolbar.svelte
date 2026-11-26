@@ -8,7 +8,7 @@
   import { copyAsRichText, copyAsMarkdown } from "../utils/clipboard";
   import { t, translate } from "$lib/i18n";
   import ReaderControls from "./ReaderControls.svelte";
-  import brandLogo from "$lib/assets/mdhero-icon.png";
+  import brandLogo from "$lib/assets/mid-icon.png";
 
   let {
     onPaste = () => {},
@@ -120,8 +120,8 @@
 
 <header class="toolbar">
   <div class="toolbar-left">
-    <img src={brandLogo} alt="MDHero" width="26" height="26" class="toolbar-logo" />
-    <span class="toolbar-wordmark">MDHero</span>
+    <img src={brandLogo} alt="MiD" width="26" height="26" class="toolbar-logo" />
+    <span class="toolbar-wordmark">MiD</span>
     <div class="btn-group">
       <button onclick={onOpen} class="btn btn-primary" title={$t('toolbar.openTitle', { mod: MOD })}>
         {$t('toolbar.open')}

@@ -17,8 +17,8 @@ import { settings } from "./settings";
 const RELEASES_ENDPOINT = "https://api.github.com/repos/vaibhav-kakde-in/mdhero/releases/latest";
 
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
-const LAST_CHECK_KEY = "mdhero_update_check";
-const DISMISSED_KEY = "mdhero_update_dismissed"; // value = the version number that was dismissed
+const LAST_CHECK_KEY = "mid_update_check";
+const DISMISSED_KEY = "mid_update_dismissed"; // value = the version number that was dismissed
 
 export interface UpdateInfo {
   version: string;
@@ -57,6 +57,11 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
+/** Release names distinguish MiD packages from builds of the upstream app. */
+export function isMiDArtifact(name: unknown): boolean {
+  return typeof name === "string" && /^mid[-_].+\.(?:AppImage|deb|rpm|dmg|msi|exe|app\.tar\.gz|appimage\.tar\.gz|zip)$/i.test(name);
+}
+
 async function fetchLatestRelease(): Promise<UpdateInfo | null> {
   const res = await fetch(RELEASES_ENDPOINT, {
     headers: { Accept: "application/vnd.github.v3+json" },
@@ -65,7 +70,8 @@ async function fetchLatestRelease(): Promise<UpdateInfo | null> {
   const data = await res.json();
   const tag: string = data?.tag_name ?? "";
   const url: string = data?.html_url ?? "";
-  if (!tag || !url) return null;
+  if (!tag || !url || !Array.isArray(data?.assets)
+      || !data.assets.some((asset: { name?: unknown } | null) => isMiDArtifact(asset?.name))) return null;
   return { version: tag.replace(/^v/, ""), url };
 }
 

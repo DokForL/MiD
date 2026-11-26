@@ -1,9 +1,9 @@
-# MDHero Quick Look extension (macOS)
+# MiD Quick Look extension (macOS)
 
 Select a `.md` file in Finder, press Space, see it rendered. Issue #88.
 
 The extension is a macOS app extension (`.appex`) that ships inside
-`MDHero.app/Contents/PlugIns/`. MDHero must be installed for macOS to register
+`MiD.app/Contents/PlugIns/`. MiD must be installed for macOS to register
 it, but does not have to be running.
 
 ## How it is put together
@@ -51,14 +51,14 @@ register:
 pnpm quicklook:appex
 pnpm tauri build --debug --bundles app --config src-tauri/tauri.quicklook.conf.json
 
-APP="src-tauri/target/debug/bundle/macos/MDHero.app"
+APP="src-tauri/target/debug/bundle/macos/MiD.app"
 LSREG=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 "$LSREG" -f "$APP"
-pluginkit -a "$PWD/$APP/Contents/PlugIns/MDHeroQuickLook.appex"
+pluginkit -a "$PWD/$APP/Contents/PlugIns/MiDQuickLook.appex"
 
 qlmanage -p some-file.md          # preview it
-pluginkit -m -v -p com.apple.quicklook.preview | grep mdhero   # confirm it registered
-pluginkit -r "$PWD/$APP/Contents/PlugIns/MDHeroQuickLook.appex" # unregister when done
+pluginkit -m -v -p com.apple.quicklook.preview | grep mid   # confirm it registered
+pluginkit -r "$PWD/$APP/Contents/PlugIns/MiDQuickLook.appex" # unregister when done
 ```
 
 Re-run `lsregister -f` after each rebuild of the app bundle; otherwise pluginkit
@@ -68,7 +68,7 @@ The extension logs to the unified log. This is the fastest way to see what it
 did:
 
 ```bash
-log stream --predicate 'eventMessage CONTAINS "MDHeroQuickLook"' --style compact
+log stream --predicate 'eventMessage CONTAINS "MiDQuickLook"' --style compact
 ```
 
 ## Things that will bite you
@@ -96,7 +96,7 @@ renders the view the instant the handler fires, so calling it right after
 renderer's minified source contains both strings (DOMPurify builds document
 fragments). Replacing them injects a `<script>` — and its `</script>` — *inside*
 the bundle, truncating it mid-file and spilling the rest onto the page as
-visible text. Use the `__MDHERO_PRELUDE__` / `__MDHERO_BOOT__` tokens. The same
+visible text. Use the `__MID_PRELUDE__` / `__MID_BOOT__` tokens. The same
 hazard is why `build-quicklook.mjs` escapes `<!--` as `\x3C!--` before inlining.
 
 **Debugging it is deliberately awkward.** A `loadHTMLString` document has an

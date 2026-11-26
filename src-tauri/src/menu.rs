@@ -36,13 +36,13 @@ pub fn create_menu_with_labels<R: Runtime>(
     // macOS app menu (app name menu with Quit, Hide, etc.)
     let app_menu = Submenu::with_items(
         app,
-        "MDHero",
+        "MiD",
         true,
         &[
             &MenuItem::with_id(
                 app,
                 "about",
-                tr(labels, "menu.about", "About MDHero"),
+                tr(labels, "menu.about", "About MiD"),
                 true,
                 None::<&str>,
             )?,
@@ -64,7 +64,7 @@ pub fn create_menu_with_labels<R: Runtime>(
             &MenuItem::with_id(
                 app,
                 "quit",
-                tr(labels, "menu.quit", "Quit MDHero"),
+                tr(labels, "menu.quit", "Quit MiD"),
                 true,
                 Some("CmdOrCtrl+Q"),
             )?,

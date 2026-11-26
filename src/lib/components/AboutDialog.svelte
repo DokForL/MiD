@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { X } from "@lucide/svelte";
   import { getVersion } from "@tauri-apps/api/app";
-  import appIcon from "$lib/assets/mdhero-icon.png";
+  import appIcon from "$lib/assets/mid-icon.png";
   import { t } from "$lib/i18n";
 
   let { visible = $bindable(false) }: { visible: boolean } = $props();
@@ -41,8 +41,8 @@
 
       <div class="dialog-body">
         <div class="about-content">
-          <img src={appIcon} class="app-icon" alt="MDHero" width="48" height="48" />
-          <h3 class="app-name">MDHero</h3>
+          <img src={appIcon} class="app-icon" alt="MiD" width="48" height="48" />
+          <h3 class="app-name">MiD</h3>
           <p class="app-version">{$t('about.version', { version: appVersion })}</p>
           <p class="app-description">{$t('about.description')}</p>
           <a
@@ -51,7 +51,7 @@
             target="_blank"
             rel="noopener noreferrer"
           >
-            github.com/vaibhav-kakde-in/mdhero
+            GitHub
           </a>
         </div>
       </div>

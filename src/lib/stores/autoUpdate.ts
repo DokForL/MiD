@@ -1,3 +1,4 @@
+import { isMiDArtifact } from "./updater";
 import { writable, get } from "svelte/store";
 
 /**
@@ -40,6 +41,26 @@ export async function installUpdate(): Promise<void> {
       updateError.set("No update available.");
       updateInstalling.set(false);
       return;
+    }
+
+    // Recheck the signed manifest's artifact names before installing. The
+    // upstream repository can publish a different latest release meanwhile.
+    const manifest = update.rawJson;
+    const platforms = manifest.platforms;
+    const entries = platforms && typeof platforms === "object"
+      ? Object.values(platforms as Record<string, { url?: unknown } | null>)
+      : [{ url: manifest.url }];
+    const compatible = entries.length > 0 && entries.every((entry) => {
+      if (typeof entry?.url !== "string") return false;
+      try {
+        return isMiDArtifact(decodeURIComponent(new URL(entry.url).pathname.split("/").pop() ?? ""));
+      } catch {
+        return false;
+      }
+    });
+    if (!compatible) {
+      await update.close();
+      throw new Error("The update feed does not contain MiD packages.");
     }
 
     let downloaded = 0;

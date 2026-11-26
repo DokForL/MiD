@@ -3,7 +3,7 @@
   "bundle": {
     "macOS": {
       "files": {
-        "PlugIns/MDHeroQuickLook.appex": "../quicklook/build/MDHeroQuickLook.appex"
+        "PlugIns/MiDQuickLook.appex": "../quicklook/build/MiDQuickLook.appex"
       }
     }
   }

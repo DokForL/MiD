@@ -1,6 +1,6 @@
-# Contributing to MDHero
+# Contributing to MiD
 
-Thanks for your interest in MDHero! This is a side project, so response times may vary — but contributions are very welcome.
+Thanks for your interest in MiD! This is a side project, so response times may vary — but contributions are very welcome.
 
 ---
 
@@ -37,8 +37,8 @@ Small PRs (bug fixes, typos, minor tweaks) don't need an issue first.
 
 ```bash
 # Clone
-git clone https://github.com/vaibhav-kakde-in/mdhero.git
-cd mdhero
+git clone https://github.com/vaibhav-kakde-in/mdhero.git MiD
+cd MiD
 
 # Install dependencies
 pnpm install
@@ -143,8 +143,8 @@ If you find a security issue, please email **vaibhavuk.dev@gmail.com** instead o
 
 ### Invariants — please don't undo these
 
-MDHero opens `.md` files of unknown provenance: downloads, email attachments,
-shared repos, `mdhero://` links. **A markdown document is untrusted input.** The
+MiD opens `.md` files of unknown provenance: downloads, email attachments,
+shared repos, `mid://` links. **A markdown document is untrusted input.** The
 controls below were added in response to a real disclosure, and each one is easy
 to remove by accident while doing something otherwise reasonable.
 

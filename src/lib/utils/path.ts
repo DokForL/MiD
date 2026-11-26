@@ -1,6 +1,6 @@
 // Cross-platform path helpers.
 //
-// MDHero ships Windows, macOS and Linux builds, but several call sites derived
+// MiD ships Windows, macOS and Linux builds, but several call sites derived
 // a file name with `path.split("/").pop()`. On Windows a path has no forward
 // slashes, so that returns the *entire* path — which is what the tab and window
 // titles were showing. These helpers handle both separators and are unit tested

@@ -1,10 +1,10 @@
 ---
 marp: true
-title: MDHero — Marp Demo
+title: MiD — Marp Demo
 paginate: true
 ---
 
-# MDHero Marp Demo
+# MiD Marp Demo
 
 A **minimal Marp** presentation, rendered natively.
 

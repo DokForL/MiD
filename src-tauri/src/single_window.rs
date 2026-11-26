@@ -7,7 +7,7 @@
 //!
 //! Off by default: a launch opening its own window stays the behaviour, as the
 //! discussion on #71 asked. On macOS the setting does not apply, since the OS
-//! already routes a file opened while MDHero runs to the running app
+//! already routes a file opened while MiD runs to the running app
 //! (`RunEvent::Opened`).
 
 use std::path::PathBuf;
@@ -46,7 +46,7 @@ pub fn is_enabled(identifier: &str) -> bool {
 /// Whether the single-instance plugin can be registered on this machine.
 ///
 /// On Linux the plugin claims a D-Bus name and panics when no session bus
-/// address can be resolved, which would stop MDHero from starting at all — with
+/// address can be resolved, which would stop MiD from starting at all — with
 /// the setting that caused it out of reach. zbus resolves the address from
 /// these two places, so without either the mode is skipped instead.
 #[cfg(target_os = "linux")]
@@ -144,7 +144,7 @@ mod tests {
 
     #[test]
     fn no_preference_file_means_off() {
-        assert!(!is_enabled("com.mdhero.test.no-such-identifier"));
+        assert!(!is_enabled("com.mid.test.no-such-identifier"));
     }
 
     #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -152,7 +152,7 @@ mod tests {
     fn file_args_skips_the_executable_and_flags() {
         let cwd = std::env::temp_dir();
         let argv = vec![
-            "mdhero".to_string(),
+            "mid".to_string(),
             "--verbose".to_string(),
             "notes.md".to_string(),
         ];
@@ -167,7 +167,7 @@ mod tests {
     fn file_args_keeps_absolute_paths_as_given() {
         let absolute = std::env::temp_dir().join("doc.md");
         let absolute = absolute.to_string_lossy().into_owned();
-        let argv = vec!["mdhero".to_string(), absolute.clone()];
+        let argv = vec!["mid".to_string(), absolute.clone()];
         assert_eq!(file_args(&argv, "/somewhere/else"), vec![absolute]);
     }
 }

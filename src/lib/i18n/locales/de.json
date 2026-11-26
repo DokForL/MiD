@@ -13,7 +13,7 @@
     "resizeHint": "Ziehen zum Anpassen – Doppelklick zum Zurücksetzen"
   },
   "about": {
-    "title": "Über MDHero",
+    "title": "Über MiD",
     "version": "Version {version}",
     "description": "Ein schöner, schneller Markdown-Viewer für Ihren Desktop."
   },
@@ -196,7 +196,7 @@
     "restoreTabs": "Tabs beim Start wiederherstellen",
     "restoreTabsHint": "Die zuletzt geöffneten Dateien in derselben Reihenfolge wieder öffnen.",
     "openInExistingWindow": "Dateien im vorhandenen Fenster öffnen",
-    "openInExistingWindowHint": "Aus dem Dateimanager oder der Befehlszeile geöffnete Dateien werden hier als Tabs geöffnet statt in neuen Fenstern. Gilt ab dem nächsten Start von MDHero.",
+    "openInExistingWindowHint": "Aus dem Dateimanager oder der Befehlszeile geöffnete Dateien werden hier als Tabs geöffnet statt in neuen Fenstern. Gilt ab dem nächsten Start von MiD.",
     "tabsOnSide": "Tabs seitlich",
     "tabsOnSideHint": "Geöffnete Dateien in einem anpassbaren Bereich links statt in einer Leiste oben anzeigen.",
     "autoPresentMarp": "Marp-Deck automatisch präsentieren",
@@ -232,7 +232,7 @@
     "releaseNotes": "Versionshinweise",
     "updateNow": "Jetzt aktualisieren",
     "dismiss": "Bis zur nächsten Version ausblenden",
-    "toastAvailable": "MDHero v{version} ist verfügbar"
+    "toastAvailable": "MiD v{version} ist verfügbar"
   },
   "aiLookup": {
     "editProvider": "Anbieter bearbeiten",
@@ -286,7 +286,7 @@
     "overwrite": "Überschreiben",
     "unsavedChangesOne": "Sie haben ungespeicherte Änderungen an {name}.",
     "unsavedChangesMany": "Sie haben ungespeicherte Änderungen in {count} Tabs.",
-    "upToDate": "MDHero ist auf dem neuesten Stand."
+    "upToDate": "MiD ist auf dem neuesten Stand."
   },
   "markdown": {
     "copy": "Kopieren",
@@ -307,12 +307,12 @@
     "edit": "Bearbeiten",
     "view": "Ansicht",
     "window": "Fenster",
-    "about": "Über MDHero",
+    "about": "Über MiD",
     "checkUpdates": "Nach Updates suchen…",
-    "hide": "MDHero ausblenden",
+    "hide": "MiD ausblenden",
     "hideOthers": "Andere ausblenden",
     "showAll": "Alle einblenden",
-    "quit": "MDHero beenden",
+    "quit": "MiD beenden",
     "open": "Öffnen...",
     "pasteMarkdown": "Markdown einfügen...",
     "print": "Drucken...",

@@ -12,7 +12,7 @@
     getCurrentWebview()
       .onDragDropEvent((event) => {
         if (event.payload.type === "over") {
-          if ((window as any).__mdhero_tab_dragging) return;
+          if ((window as any).__mid_tab_dragging) return;
           isDragging = true;
         } else if (event.payload.type === "drop") {
           isDragging = false;

@@ -1,6 +1,6 @@
 import { writable, get } from "svelte/store";
 
-const STORAGE_KEY = "mdhero:readingProgress";
+const STORAGE_KEY = "mid:readingProgress";
 const MAX_ENTRIES = 500;
 
 interface ProgressEntry {

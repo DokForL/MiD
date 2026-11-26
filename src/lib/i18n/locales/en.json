@@ -13,7 +13,7 @@
     "resizeHint": "Drag to resize — double-click to reset"
   },
   "about": {
-    "title": "About MDHero",
+    "title": "About MiD",
     "version": "Version {version}",
     "description": "A beautiful, fast Markdown viewer for your desktop."
   },
@@ -196,7 +196,7 @@
     "restoreTabs": "Restore tabs on launch",
     "restoreTabsHint": "Reopen the files that were open last time, in the same order.",
     "openInExistingWindow": "Open files in the existing window",
-    "openInExistingWindowHint": "Files opened from your file manager or the command line become tabs here instead of new windows. Applies from the next launch of MDHero.",
+    "openInExistingWindowHint": "Files opened from your file manager or the command line become tabs here instead of new windows. Applies from the next launch of MiD.",
     "tabsOnSide": "Tabs on the side",
     "tabsOnSideHint": "Show open files in a resizable panel on the left instead of a row across the top.",
     "autoPresentMarp": "Auto-present Marp decks",
@@ -232,7 +232,7 @@
     "releaseNotes": "Release notes",
     "updateNow": "Update now",
     "dismiss": "Dismiss until next release",
-    "toastAvailable": "MDHero v{version} is available"
+    "toastAvailable": "MiD v{version} is available"
   },
   "aiLookup": {
     "editProvider": "Edit provider",
@@ -286,7 +286,7 @@
     "overwrite": "Overwrite",
     "unsavedChangesOne": "You have unsaved changes to {name}.",
     "unsavedChangesMany": "You have unsaved changes in {count} tabs.",
-    "upToDate": "MDHero is up to date."
+    "upToDate": "MiD is up to date."
   },
   "markdown": {
     "copy": "Copy",
@@ -307,12 +307,12 @@
     "edit": "Edit",
     "view": "View",
     "window": "Window",
-    "about": "About MDHero",
+    "about": "About MiD",
     "checkUpdates": "Check for Updates…",
-    "hide": "Hide MDHero",
+    "hide": "Hide MiD",
     "hideOthers": "Hide Others",
     "showAll": "Show All",
-    "quit": "Quit MDHero",
+    "quit": "Quit MiD",
     "open": "Open...",
     "pasteMarkdown": "Paste Markdown...",
     "print": "Print...",

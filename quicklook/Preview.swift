@@ -33,8 +33,8 @@ final class PreviewViewController: NSViewController, QLPreviewingController,
         let container = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
 
         let config = WKWebViewConfiguration()
-        config.userContentController.add(self, name: "mdheroReady")
-        config.userContentController.add(self, name: "mdheroError")
+        config.userContentController.add(self, name: "midReady")
+        config.userContentController.add(self, name: "midError")
 
         webView = WKWebView(frame: container.bounds, configuration: config)
         webView.autoresizingMask = [.width, .height]
@@ -59,7 +59,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController,
             expectingInitialLoad = true
             webView.loadHTMLString(html, baseURL: nil)
         } catch {
-            NSLog("MDHeroQuickLook: %@", error.localizedDescription)
+            NSLog("MiDQuickLook: %@", error.localizedDescription)
             pending = nil
             handler(error)
         }
@@ -71,7 +71,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController,
         let markdown = try String(contentsOf: url, encoding: .utf8)
 
         guard let template = Bundle.main.url(forResource: "preview", withExtension: "html") else {
-            throw NSError(domain: "MDHeroQuickLook", code: 1, userInfo: [
+            throw NSError(domain: "MiDQuickLook", code: 1, userInfo: [
                 NSLocalizedDescriptionKey: "preview.html is missing from the extension bundle",
             ])
         }
@@ -88,8 +88,8 @@ final class PreviewViewController: NSViewController, QLPreviewingController,
         // strings (DOMPurify builds document fragments); replacing them injects
         // a `</script>` INSIDE the bundle, truncating it mid-file and spilling
         // the remainder onto the page as text.
-        html = html.replacingOccurrences(of: "__MDHERO_PRELUDE__", with: prelude(nonce: nonce))
-        html = html.replacingOccurrences(of: "__MDHERO_BOOT__",
+        html = html.replacingOccurrences(of: "__MID_PRELUDE__", with: prelude(nonce: nonce))
+        html = html.replacingOccurrences(of: "__MID_BOOT__",
                                          with: boot(nonce: nonce, markdown: markdown))
         return html
     }
@@ -100,15 +100,15 @@ final class PreviewViewController: NSViewController, QLPreviewingController,
     private func prelude(nonce: String) -> String {
         """
         <script nonce="\(nonce)">
-        var __mdheroReport = function (m) {
-          try { window.webkit.messageHandlers.mdheroError.postMessage(String(m)); } catch (e) {}
+        var __midReport = function (m) {
+          try { window.webkit.messageHandlers.midError.postMessage(String(m)); } catch (e) {}
         };
-        window.onerror = function (m, s, l, c) { __mdheroReport(m + " @" + l + ":" + c); };
+        window.onerror = function (m, s, l, c) { __midReport(m + " @" + l + ":" + c); };
         window.onunhandledrejection = function (e) {
-          __mdheroReport("unhandled rejection: " + ((e.reason && e.reason.message) || e.reason));
+          __midReport("unhandled rejection: " + ((e.reason && e.reason.message) || e.reason));
         };
         document.addEventListener("securitypolicyviolation", function (e) {
-          __mdheroReport("CSP blocked " + e.violatedDirective + " <- " + e.blockedURI);
+          __midReport("CSP blocked " + e.violatedDirective + " <- " + e.blockedURI);
         });
         </script>
         """
@@ -117,8 +117,8 @@ final class PreviewViewController: NSViewController, QLPreviewingController,
     private func boot(nonce: String, markdown: String) -> String {
         """
         <script nonce="\(nonce)">
-        window.__mdheroRender(\(Self.jsString(markdown)), \(prefersDark))
-          .catch(function (e) { __mdheroReport("render failed: " + e); });
+        window.__midRender(\(Self.jsString(markdown)), \(prefersDark))
+          .catch(function (e) { __midReport("render failed: " + e); });
         </script>
         """
     }
@@ -133,7 +133,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController,
             SecRandomCopyBytes(kSecRandomDefault, 16, $0.baseAddress!)
         }
         guard status == errSecSuccess else {
-            throw NSError(domain: "MDHeroQuickLook", code: Int(status), userInfo: [
+            throw NSError(domain: "MiDQuickLook", code: Int(status), userInfo: [
                 NSLocalizedDescriptionKey: "could not generate a CSP nonce (SecRandomCopyBytes \(status))",
             ])
         }
@@ -162,11 +162,11 @@ final class PreviewViewController: NSViewController, QLPreviewingController,
     func userContentController(_ controller: WKUserContentController,
                                didReceive message: WKScriptMessage) {
         switch message.name {
-        case "mdheroReady":
+        case "midReady":
             pending?(nil)
             pending = nil
-        case "mdheroError":
-            NSLog("MDHeroQuickLook: %@", String(describing: message.body))
+        case "midError":
+            NSLog("MiDQuickLook: %@", String(describing: message.body))
         default:
             break
         }
@@ -181,7 +181,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController,
     /// attacker-chosen URL from a process holding
     /// `com.apple.security.network.client`, turning any previewed file into a
     /// beacon: the reader's IP, the time, and the fact that this document was
-    /// opened. Links are therefore dead in the preview; open the file in MDHero
+    /// opened. Links are therefore dead in the preview; open the file in MiD
     /// to follow them.
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
@@ -190,7 +190,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController,
             decisionHandler(.allow)
             return
         }
-        NSLog("MDHeroQuickLook: blocked navigation to %@",
+        NSLog("MiDQuickLook: blocked navigation to %@",
               navigationAction.request.url?.absoluteString ?? "(none)")
         decisionHandler(.cancel)
     }
@@ -200,7 +200,7 @@ final class PreviewViewController: NSViewController, QLPreviewingController,
         // if the renderer never reports in.
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             guard let self, self.pending != nil else { return }
-            NSLog("MDHeroQuickLook: renderer did not report ready; releasing anyway")
+            NSLog("MiDQuickLook: renderer did not report ready; releasing anyway")
             self.pending?(nil)
             self.pending = nil
         }

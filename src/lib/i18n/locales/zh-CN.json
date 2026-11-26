@@ -13,7 +13,7 @@
     "resizeHint": "拖动以调整宽度，双击恢复默认"
   },
   "about": {
-    "title": "关于 MDHero",
+    "title": "关于 MiD",
     "version": "版本 {version}",
     "description": "一款精美、快速的桌面端 Markdown 阅读器。"
   },
@@ -195,7 +195,7 @@
     "restoreTabs": "启动时恢复标签页",
     "restoreTabsHint": "按相同顺序重新打开上次打开的文件。",
     "openInExistingWindow": "在现有窗口中打开文件",
-    "openInExistingWindowHint": "从文件管理器或命令行打开的文件会作为标签页在此打开，而不是打开新窗口。下次启动 MDHero 时生效。",
+    "openInExistingWindowHint": "从文件管理器或命令行打开的文件会作为标签页在此打开，而不是打开新窗口。下次启动 MiD 时生效。",
     "tabsOnSide": "侧边标签页",
     "tabsOnSideHint": "在左侧可调整宽度的面板中显示已打开的文件，而不是在顶部排成一行。",
     "autoPresentMarp": "自动演示 Marp 幻灯片",
@@ -231,7 +231,7 @@
     "releaseNotes": "更新说明",
     "updateNow": "立即更新",
     "dismiss": "忽略，直到下一个版本",
-    "toastAvailable": "MDHero v{version} 已可更新"
+    "toastAvailable": "MiD v{version} 已可更新"
   },
   "aiLookup": {
     "editProvider": "编辑服务商",
@@ -284,7 +284,7 @@
     "overwrite": "覆盖",
     "unsavedChangesOne": "您对 {name} 有未保存的更改。",
     "unsavedChangesMany": "您有 {count} 个标签页存在未保存的更改。",
-    "upToDate": "MDHero 已是最新版本。"
+    "upToDate": "MiD 已是最新版本。"
   },
   "markdown": {
     "copy": "复制",
@@ -305,12 +305,12 @@
     "edit": "编辑",
     "view": "视图",
     "window": "窗口",
-    "about": "关于 MDHero",
+    "about": "关于 MiD",
     "checkUpdates": "检查更新…",
-    "hide": "隐藏 MDHero",
+    "hide": "隐藏 MiD",
     "hideOthers": "隐藏其他",
     "showAll": "全部显示",
-    "quit": "退出 MDHero",
+    "quit": "退出 MiD",
     "open": "打开...",
     "pasteMarkdown": "粘贴 Markdown...",
     "print": "打印...",

@@ -1,9 +1,6 @@
 <div align="center">
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/banner-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset=".github/assets/banner-light.png">
-  <img alt="MDHero" src=".github/assets/banner-light.png" width="100%">
-</picture>
+<img src="src/lib/assets/mid-icon.png" width="96" height="96" alt="">
+<h1>MiD</h1>
 <br>
 A beautiful, native Markdown viewer and lightweight editor for macOS, Windows and Linux. ~8MB. Free. Open source.
 <br><br>
@@ -16,14 +13,14 @@ A beautiful, native Markdown viewer and lightweight editor for macOS, Windows an
 ![Linux](https://img.shields.io/badge/Linux-supported-blue?style=flat-square&logo=linux)
 [![Built with Tauri](https://img.shields.io/badge/Built_with-Tauri-FFC131?style=flat-square&logo=tauri)](https://tauri.app)
 
-[Download](https://github.com/vaibhav-kakde-in/mdhero/releases/latest) · [Website](https://mdhero.app) · [Discussions](https://github.com/vaibhav-kakde-in/mdhero/discussions)
+[Upstream releases](https://github.com/vaibhav-kakde-in/mdhero/releases/latest) · [Upstream website](https://mdhero.app) · [Discussions](https://github.com/vaibhav-kakde-in/mdhero/discussions)
 
 </div>
 
 <table>
 <tr>
-<td><img src=".github/assets/hero-light.png" alt="MDHero Light Mode"></td>
-<td><img src=".github/assets/hero-dark.png" alt="MDHero Dark Mode"></td>
+<td><img src=".github/assets/hero-light.png" alt="MiD Light Mode"></td>
+<td><img src=".github/assets/hero-dark.png" alt="MiD Dark Mode"></td>
 </tr>
 <tr>
 <td align="center"><em>Light mode</em></td>
@@ -35,11 +32,11 @@ Open local `.md` files, paste AI-generated markdown, or fetch from any public UR
 
 ---
 
-## Why MDHero
+## Why MiD
 
 Markdown is where developers, writers, and AI live today — READMEs, Claude Code plans, LLM chat exports, notes, documentation. But opening a `.md` file in a code editor gives you ugly monospace text. Opening a web-based viewer means uploading your files. GitHub renders it beautifully but only if the file is in a repo.
 
-**MDHero is a native app for everything in between.** Your files stay local. Rendering is instant. Edit in place when you need to. Works offline. Looks like it belongs on your machine.
+**MiD is a native app for everything in between.** Your files stay local. Rendering is instant. Edit in place when you need to. Works offline. Looks like it belongs on your machine.
 
 ---
 
@@ -78,7 +75,7 @@ Markdown is where developers, writers, and AI live today — READMEs, Claude Cod
 - **Recent files** — pick up where you left off, with reading progress per file
 
 ### Live
-- **File watching** — edit in VS Code, see updates instantly in MDHero
+- **File watching** — edit in VS Code, see updates instantly in MiD
 - **Auto-reload** — survives atomic saves (VS Code, vim, etc.)
 
 ### Sharing
@@ -118,13 +115,13 @@ Distraction-free full-screen reading. Just you and the document.
 
 ## Install
 
-**macOS** (Apple Silicon): Download `.dmg` from [Releases →](https://github.com/vaibhav-kakde-in/mdhero/releases/latest)
+**macOS** (Apple Silicon): See upstream `.dmg` packages in [Releases →](https://github.com/vaibhav-kakde-in/mdhero/releases/latest)
 
-**Windows** (x64 or ARM64): Download `.msi` or `-setup.exe` from [Releases →](https://github.com/vaibhav-kakde-in/mdhero/releases/latest) — pick the `x64` or `arm64` file for your machine
+**Windows** (x64 or ARM64): See upstream `.msi` and `-setup.exe` packages in [Releases →](https://github.com/vaibhav-kakde-in/mdhero/releases/latest) — pick the `x64` or `arm64` file for your machine
 
-**Linux** (x64 or arm64): Download `.deb` (Debian/Ubuntu), `.rpm` (Fedora/openSUSE) or `.AppImage` (any distro) from [Releases →](https://github.com/vaibhav-kakde-in/mdhero/releases/latest) — `amd64`/`x86_64` or `arm64`/`aarch64`
+**Linux** (x64 or arm64): See upstream `.deb` (Debian/Ubuntu), `.rpm` (Fedora/openSUSE), and `.AppImage` packages in [Releases →](https://github.com/vaibhav-kakde-in/mdhero/releases/latest) — `amd64`/`x86_64` or `arm64`/`aarch64`
 
-Or build from source (see below).
+Build MiD from this checkout (see below).
 
 ---
 
@@ -181,7 +178,7 @@ Port 1420 is used for dev. Kill stale processes with `lsof -ti:1420 | xargs kill
 
 ## Privacy
 
-MDHero runs entirely on your machine.
+MiD runs entirely on your machine.
 
 - **No telemetry.** No analytics. No tracking.
 - **No account required.** Use it anonymously.

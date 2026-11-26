@@ -39,7 +39,7 @@ pub(crate) fn deliver_opened_files(app: &tauri::AppHandle, file_paths: Vec<Strin
     if let Some(window) = app.get_webview_window("main") {
         for file_path in &file_paths {
             let js = format!(
-                "window.__mdhero_open_path?.({})",
+                "window.__mid_open_path?.({})",
                 serde_json::json!(file_path)
             );
             let _ = window.eval(&js);
@@ -53,14 +53,14 @@ pub(crate) fn deliver_opened_files(app: &tauri::AppHandle, file_paths: Vec<Strin
     }
 }
 
-/// Parse a `mdhero://open?path=<url-encoded-abs-path>` deep link into an
+/// Parse a `mid://open?path=<url-encoded-abs-path>` deep link into an
 /// absolute markdown file path. Returns None for any other action, a relative
 /// path, a non-markdown extension, or a file that doesn't exist — the scheme is
 /// a door any webpage can knock on, so we validate strictly before opening. The
 /// path only ever routes to `openFile` (read + render), never a write or exec.
 #[cfg(target_os = "macos")]
-fn parse_mdhero_url(url: &tauri::Url) -> Option<String> {
-    // Action lives in the authority slot: mdhero://open?path=...
+fn parse_mid_url(url: &tauri::Url) -> Option<String> {
+    // Action lives in the authority slot: mid://open?path=...
     if url.host_str() != Some("open") {
         return None;
     }
@@ -152,7 +152,7 @@ pub fn run() {
                 main_window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                         api.prevent_close();
-                        let _ = quit_win.eval("window.__mdhero_quit?.()");
+                        let _ = quit_win.eval("window.__mid_quit?.()");
                     }
                 });
             }
@@ -162,31 +162,31 @@ pub fn run() {
                     let id = event.id().as_ref();
                     match id {
                         "open" => {
-                            let _ = window.eval("window.__mdhero_open_file?.()");
+                            let _ = window.eval("window.__mid_open_file?.()");
                         }
                         "paste_md" => {
-                            let _ = window.eval("window.__mdhero_paste?.()");
+                            let _ = window.eval("window.__mid_paste?.()");
                         }
                         "theme" => {
-                            let _ = window.eval("window.__mdhero_toggle_theme?.()");
+                            let _ = window.eval("window.__mid_toggle_theme?.()");
                         }
                         "find" => {
-                            let _ = window.eval("window.__mdhero_find?.()");
+                            let _ = window.eval("window.__mid_find?.()");
                         }
                         "close" => {
-                            let _ = window.eval("window.__mdhero_close_tab?.()");
+                            let _ = window.eval("window.__mid_close_tab?.()");
                         }
                         "print" => {
-                            let _ = window.eval("window.__mdhero_print?.()");
+                            let _ = window.eval("window.__mid_print?.()");
                         }
                         "check_updates" => {
-                            let _ = window.eval("window.__mdhero_check_updates?.()");
+                            let _ = window.eval("window.__mid_check_updates?.()");
                         }
                         "about" => {
-                            let _ = window.eval("window.__mdhero_about?.()");
+                            let _ = window.eval("window.__mid_about?.()");
                         }
                         "quit" => {
-                            let _ = window.eval("window.__mdhero_quit?.()");
+                            let _ = window.eval("window.__mid_quit?.()");
                         }
                         // AI lookup right-click menu items — forward the
                         // structured ID to the frontend router. JSON-stringify
@@ -194,7 +194,7 @@ pub fn run() {
                         // chars) survive the eval boundary cleanly.
                         s if s.starts_with("aimenu:") => {
                             let js =
-                                format!("window.__mdhero_ai_lookup?.({})", serde_json::json!(s));
+                                format!("window.__mid_ai_lookup?.({})", serde_json::json!(s));
                             let _ = window.eval(&js);
                         }
                         _ => {}
@@ -214,14 +214,14 @@ pub fn run() {
 
                 for url in urls {
                     // "Open With" / double-click deliver a file: URL; the
-                    // mdhero:// scheme (#60) delivers a link to parse. Unknown
+                    // mid:// scheme (#60) delivers a link to parse. Unknown
                     // schemes are dropped (openFile can't do anything with them).
                     let path = match url.scheme() {
                         "file" => url
                             .to_file_path()
                             .ok()
                             .map(|p| p.to_string_lossy().to_string()),
-                        "mdhero" => parse_mdhero_url(&url),
+                        "mid" => parse_mid_url(&url),
                         _ => None,
                     };
 
@@ -237,7 +237,7 @@ pub fn run() {
 
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
-    use super::parse_mdhero_url;
+    use super::parse_mid_url;
     use tauri::Url;
 
     fn u(s: &str) -> Url {
@@ -246,14 +246,14 @@ mod tests {
 
     #[test]
     fn parses_valid_open_url_with_encoded_space() {
-        let file = std::env::temp_dir().join("mdhero deep link.md");
+        let file = std::env::temp_dir().join("mid deep link.md");
         std::fs::write(&file, "# hi").unwrap();
         let enc = format!(
-            "mdhero://open?path={}",
+            "mid://open?path={}",
             file.to_string_lossy().replace(' ', "%20")
         );
         assert_eq!(
-            parse_mdhero_url(&u(&enc)),
+            parse_mid_url(&u(&enc)),
             Some(file.to_string_lossy().to_string())
         );
         std::fs::remove_file(&file).ok();
@@ -262,10 +262,10 @@ mod tests {
     #[test]
     fn expands_tilde() {
         let home = std::env::var("HOME").unwrap();
-        let file = std::path::Path::new(&home).join("mdhero_tilde_test.md");
+        let file = std::path::Path::new(&home).join("mid_tilde_test.md");
         std::fs::write(&file, "x").unwrap();
         assert_eq!(
-            parse_mdhero_url(&u("mdhero://open?path=~/mdhero_tilde_test.md")),
+            parse_mid_url(&u("mid://open?path=~/mid_tilde_test.md")),
             Some(file.to_string_lossy().to_string())
         );
         std::fs::remove_file(&file).ok();
@@ -273,30 +273,30 @@ mod tests {
 
     #[test]
     fn rejects_wrong_action() {
-        assert_eq!(parse_mdhero_url(&u("mdhero://delete?path=/tmp/x.md")), None);
+        assert_eq!(parse_mid_url(&u("mid://delete?path=/tmp/x.md")), None);
     }
 
     #[test]
     fn rejects_non_markdown_extension() {
         // /etc/passwd exists but isn't markdown → refused before any open.
-        assert_eq!(parse_mdhero_url(&u("mdhero://open?path=/etc/passwd")), None);
+        assert_eq!(parse_mid_url(&u("mid://open?path=/etc/passwd")), None);
     }
 
     #[test]
     fn rejects_relative_path() {
-        assert_eq!(parse_mdhero_url(&u("mdhero://open?path=notes.md")), None);
+        assert_eq!(parse_mid_url(&u("mid://open?path=notes.md")), None);
     }
 
     #[test]
     fn rejects_missing_file() {
         assert_eq!(
-            parse_mdhero_url(&u("mdhero://open?path=/tmp/does-not-exist-abc.md")),
+            parse_mid_url(&u("mid://open?path=/tmp/does-not-exist-abc.md")),
             None
         );
     }
 
     #[test]
     fn rejects_missing_path_param() {
-        assert_eq!(parse_mdhero_url(&u("mdhero://open")), None);
+        assert_eq!(parse_mid_url(&u("mid://open")), None);
     }
 }

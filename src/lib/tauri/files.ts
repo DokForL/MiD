@@ -61,7 +61,7 @@ export async function openFile(path: string): Promise<void> {
     });
 
     addRecentFile(absolutePath, fileName);
-    getCurrentWindow().setTitle(`${fileName} — MDHero`).catch(() => {});
+    getCurrentWindow().setTitle(`${fileName} — MiD`).catch(() => {});
   } catch (err) {
     document.set({
       filePath: absolutePath,
@@ -117,7 +117,7 @@ export async function saveAsNewDocument(tabId: string, content: string): Promise
   tabStore.rebindPath(tabId, chosen, fileName);
   watchFile(chosen);
   addRecentFile(chosen, fileName);
-  getCurrentWindow().setTitle(`${fileName} — MDHero`).catch(() => {});
+  getCurrentWindow().setTitle(`${fileName} — MiD`).catch(() => {});
   return chosen;
 }
 
@@ -257,7 +257,7 @@ export async function allowAssets(paths: string[], documentPath: string): Promis
     });
     if (rejected.length > 0) {
       console.warn(
-        `MDHero will not serve ${rejected.length} image(s) outside the document's folder tree. Pin the folder they live in to allow them:`,
+        `MiD will not serve ${rejected.length} image(s) outside the document's folder tree. Pin the folder they live in to allow them:`,
         rejected
       );
     }

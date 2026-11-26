@@ -117,8 +117,8 @@ function buildHtml() {
    * Two substitution points for the extension, both unique tokens rather than
    * `</head>` / `</body>`:
    *
-   *   __MDHERO_PRELUDE__  error bridge, installed before the renderer runs
-   *   __MDHERO_BOOT__     the call that hands over the document text
+   *   __MID_PRELUDE__  error bridge, installed before the renderer runs
+   *   __MID_BOOT__     the call that hands over the document text
    *
    * They are tokens for a reason. The bundle's own minified source contains the
    * literal strings "</head>" and "</body>" (DOMPurify builds document
@@ -132,14 +132,14 @@ function buildHtml() {
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
-__MDHERO_PRELUDE__
-<title>MDHero preview</title>
+__MID_PRELUDE__
+<title>MiD preview</title>
 <style>${css}</style>
 </head>
 <body>
 <article id="doc" class="md-content prose prose-slate dark:prose-invert max-w-none mx-auto px-8 py-8"></article>
-<script nonce="__CSP_NONCE__">try{${js}}catch(e){__mdheroReport("renderer bundle threw: "+(e&&e.stack||e))}</script>
-__MDHERO_BOOT__
+<script nonce="__CSP_NONCE__">try{${js}}catch(e){__midReport("renderer bundle threw: "+(e&&e.stack||e))}</script>
+__MID_BOOT__
 </body>
 </html>
 `;

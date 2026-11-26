@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// MDHero's version is written out by hand in four places that do not read each
+// MiD's version is written out by hand in four places that do not read each
 // other — `tauri.conf.json` does NOT derive from `package.json`. A release bump
 // has to touch all four, and nothing in the build fails if one is missed.
 //
@@ -25,9 +25,9 @@ function cargoTomlVersion(toml: string): string | undefined {
   return pkg?.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
 }
 
-/** The `mdhero` entry in Cargo.lock, which carries its own copy. */
+/** The `mid` entry in Cargo.lock, which carries its own copy. */
 function cargoLockVersion(lock: string): string | undefined {
-  return lock.match(/name = "mdhero"\nversion = "([^"]+)"/)?.[1];
+  return lock.match(/name = "mid"\nversion = "([^"]+)"/)?.[1];
 }
 
 describe("the version is the same in every file that declares it", () => {

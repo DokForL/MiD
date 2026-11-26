@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // The tab store persists a restorable session on every change (#72). These
 // tests run it against a fake localStorage and read the key back directly.
-const SESSION_KEY = "mdhero-session";
+const SESSION_KEY = "mid-session";
 
 function fakeStorage(initial: Record<string, string> = {}) {
   const map = new Map(Object.entries(initial));

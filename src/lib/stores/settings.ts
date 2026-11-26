@@ -27,7 +27,7 @@ export interface ReaderSettings {
   tabsWidth: number;
 }
 
-const STORAGE_KEY = "mdhero-settings";
+const STORAGE_KEY = "mid-settings";
 
 /** Text-size bounds shared by every zoom control: the keyboard shortcuts, the
  *  home-screen buttons and Ctrl + mouse wheel. */

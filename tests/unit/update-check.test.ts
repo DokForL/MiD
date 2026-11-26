@@ -31,8 +31,8 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function release(tag: string) {
-  return { ok: true, json: async () => ({ tag_name: tag, html_url: `https://github.com/vaibhav-kakde-in/mdhero/releases/tag/${tag}` }) };
+function release(tag: string, name = "MiD_0.2.11_amd64.AppImage") {
+  return { ok: true, json: async () => ({ tag_name: tag, assets: [{ name }], html_url: `https://github.com/vaibhav-kakde-in/mdhero/releases/tag/${tag}` }) };
 }
 
 async function load() {
@@ -52,14 +52,14 @@ describe("the update check sends nothing about the user", () => {
     expect(url.search).toBe("");
   });
 
-  it("never contacts mdhero.app and never includes the version or OS", async () => {
+  it("never contacts mid.app and never includes the version or OS", async () => {
     fetchMock.mockResolvedValue(release("v0.2.11"));
     const { checkForUpdates } = await load();
     await checkForUpdates(true);
 
     const [url, init] = fetchMock.mock.calls[0];
     const sent = JSON.stringify([url, init]);
-    expect(sent).not.toContain("mdhero.app");
+    expect(sent).not.toContain("mid.app");
     expect(sent).not.toContain("0.2.10");
     expect(sent).not.toMatch(/darwin|win32|linux/);
   });
@@ -101,7 +101,7 @@ describe("the automatic check follows the Settings switch", () => {
   });
 
   function withSetting(on: boolean) {
-    store.set("mdhero-settings", JSON.stringify({ autoCheckUpdates: on }));
+    store.set("mid-settings", JSON.stringify({ autoCheckUpdates: on }));
   }
 
   it("checks automatically when the switch is on (the default)", async () => {
@@ -126,4 +126,11 @@ describe("the automatic check follows the Settings switch", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(get(updateAvailable)).toMatchObject({ version: "0.2.11" });
   });
+});
+
+it("ignores a newer upstream release that ships no MiD packages", async () => {
+  fetchMock.mockResolvedValue(release("v9.0.0", "MDHero_9.0.0_amd64.AppImage"));
+  const { checkForUpdates, updateAvailable } = await load();
+  await checkForUpdates(true);
+  expect(get(updateAvailable)).toBeNull();
 });

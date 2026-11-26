@@ -26,7 +26,7 @@ fn run() {
     use tauri::menu::WINDOW_SUBMENU_ID;
 
     let app = tauri::test::mock_app();
-    let menu = mdhero_lib::menu::create_menu(app.handle()).expect("menu should build");
+    let menu = mid_lib::menu::create_menu(app.handle()).expect("menu should build");
 
     let window_item = menu.get(WINDOW_SUBMENU_ID).unwrap_or_else(|| {
         panic!(
@@ -84,11 +84,11 @@ fn run() {
 
     // A translated menu (Settings → Language) must keep the tiling id: the
     // label changes, the id macOS looks for does not.
-    let labels = mdhero_lib::menu::MenuLabels::from([
+    let labels = mid_lib::menu::MenuLabels::from([
         ("menu.window".to_string(), "Fenêtre".to_string()),
         ("menu.print".to_string(), "Imprimer...".to_string()),
     ]);
-    let localized = mdhero_lib::menu::create_menu_with_labels(app.handle(), &labels)
+    let localized = mid_lib::menu::create_menu_with_labels(app.handle(), &labels)
         .expect("localized menu should build");
     let window_item = localized
         .get(WINDOW_SUBMENU_ID)

@@ -1,5 +1,5 @@
 /**
- * MDHero i18n: a small, dependency-free translation layer.
+ * MiD i18n: a small, dependency-free translation layer.
  *
  * - One JSON dictionary per locale in `./locales/`. `en.json` is the source of
  *   truth: its keys type every lookup, and it is the fallback for any key a
@@ -13,7 +13,7 @@
  *   (`{ "one": "…", "other": "…" }`), picked with `Intl.PluralRules` on
  *   `params.count`.
  * - Locale: stored choice → OS language → English. It is only persisted (under
- *   `mdhero_locale`) once the user picks one, so the first-run language picker
+ *   `mid_locale`) once the user picks one, so the first-run language picker
  *   can tell "chosen" from "detected". The locale is mirrored to `<html lang>`
  *   and to the native menu bar (`set_menu_language`).
  */
@@ -27,7 +27,7 @@ import type { MessageKey, MessageParams } from "./types";
 
 export type { MessageKey, MessageParams } from "./types";
 
-export const STORAGE_KEY = "mdhero_locale";
+export const STORAGE_KEY = "mid_locale";
 
 export const SUPPORTED_LOCALES = [
   { code: "en", label: "English", nativeName: "English" },

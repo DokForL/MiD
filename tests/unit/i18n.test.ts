@@ -6,7 +6,7 @@ import es from "../../src/lib/i18n/locales/es.json";
 import fr from "../../src/lib/i18n/locales/fr.json";
 import zhCN from "../../src/lib/i18n/locales/zh-CN.json";
 
-const LOCALE_KEY = "mdhero_locale";
+const LOCALE_KEY = "mid_locale";
 
 function fakeStorage(initial: Record<string, string> = {}) {
   const map = new Map(Object.entries(initial));

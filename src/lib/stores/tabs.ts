@@ -34,7 +34,7 @@ export interface SavedSession {
   activePath: string | null;
 }
 
-const SESSION_KEY = "mdhero-session";
+const SESSION_KEY = "mid-session";
 
 function isRestorablePath(filePath: string): boolean {
   return !!filePath

@@ -100,17 +100,17 @@ async function renderDocument(markdown: string, isDark: boolean): Promise<void> 
   // Quick Look's completion handler instead of guessing at a delay. Quick Look
   // renders the view the moment that handler fires, so releasing it early is
   // what produces a blank preview.
-  document.documentElement.dataset.mdheroReady = "1";
-  window.webkit?.messageHandlers?.mdheroReady?.postMessage(1);
+  document.documentElement.dataset.midReady = "1";
+  window.webkit?.messageHandlers?.midReady?.postMessage(1);
 }
 
 declare global {
   interface Window {
-    __mdheroRender: (markdown: string, isDark: boolean) => Promise<void>;
+    __midRender: (markdown: string, isDark: boolean) => Promise<void>;
     webkit?: {
-      messageHandlers?: { mdheroReady?: { postMessage: (v: unknown) => void } };
+      messageHandlers?: { midReady?: { postMessage: (v: unknown) => void } };
     };
   }
 }
 
-window.__mdheroRender = renderDocument;
+window.__midRender = renderDocument;

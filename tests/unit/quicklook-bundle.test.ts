@@ -185,8 +185,8 @@ describe("the generated page's security policy", () => {
   });
 
   it("substitutes at unique tokens, never at </head> or </body>", () => {
-    expect(script).toMatch(/__MDHERO_PRELUDE__/);
-    expect(script).toMatch(/__MDHERO_BOOT__/);
+    expect(script).toMatch(/__MID_PRELUDE__/);
+    expect(script).toMatch(/__MID_BOOT__/);
   });
 });
 

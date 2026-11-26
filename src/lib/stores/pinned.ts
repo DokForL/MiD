@@ -1,6 +1,6 @@
 import { writable } from "svelte/store";
 
-const STORAGE_KEY = "mdhero_pinned_folders";
+const STORAGE_KEY = "mid_pinned_folders";
 
 function loadPinned(): string[] {
   try {

@@ -9,7 +9,7 @@
   import UpdateBanner from "./UpdateBanner.svelte";
   import { basename, shortenHomePath } from "$lib/utils/path";
   import { t, formatRelativeTime } from "$lib/i18n";
-  import brandLogo from "$lib/assets/mdhero-icon.png";
+  import brandLogo from "$lib/assets/mid-icon.png";
 
   let { onOpenUrl = () => {} }: { onOpenUrl?: () => void } = $props();
 
@@ -28,16 +28,16 @@
 
   let plans = $state<PlanFile[]>([]);
   let folderFiles = $state<Record<string, MdFile[]>>({});
-  let plansHidden = $state(localStorage.getItem("mdhero_plans_hidden") === "true");
+  let plansHidden = $state(localStorage.getItem("mid_plans_hidden") === "true");
 
   function hidePlans() {
     plansHidden = true;
-    localStorage.setItem("mdhero_plans_hidden", "true");
+    localStorage.setItem("mid_plans_hidden", "true");
   }
 
   function showPlans() {
     plansHidden = false;
-    localStorage.removeItem("mdhero_plans_hidden");
+    localStorage.removeItem("mid_plans_hidden");
   }
 
   $effect(() => {
@@ -93,9 +93,9 @@
 <div class="empty-root" style="zoom: {scale};">
   <!-- Hero bar -->
   <div class="hero-bar">
-    <img src={brandLogo} alt="MDHero" width="48" height="48" class="hero-logo" />
+    <img src={brandLogo} alt="MiD" width="48" height="48" class="hero-logo" />
     <div class="hero-text">
-      <h1 class="hero-title">MDHero</h1>
+      <h1 class="hero-title">MiD</h1>
       <p class="hero-desc">{$t('empty.description')}</p>
     </div>
   </div>

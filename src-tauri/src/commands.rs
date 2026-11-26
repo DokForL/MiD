@@ -23,7 +23,7 @@ pub fn quit_app(app: tauri::AppHandle) {
 }
 
 /// Extensions the app is allowed to read from / write to on behalf of the
-/// web view. MDHero is a markdown app: a document, its links and its saves are
+/// web view. MiD is a markdown app: a document, its links and its saves are
 /// text. Bounding the two filesystem commands to this set means that even if a
 /// script ever ran in the web view (see the Mermaid/CSP hardening), it cannot
 /// turn `read_markdown_file` / `write_markdown_file` into an arbitrary-file
@@ -441,7 +441,7 @@ pub struct MdFile {
 // any text is selected. We build a native Tauri menu from that payload and
 // popup at the cursor. Click handling is in `lib.rs::setup`'s `on_menu_event`,
 // which matches IDs starting with `aimenu:` and forwards them to the JS
-// `__mdhero_ai_lookup` window function. The selection itself is held in the
+// `__mid_ai_lookup` window function. The selection itself is held in the
 // webview (not passed through here) so this command doesn't touch user content.
 
 #[derive(Deserialize)]
@@ -680,7 +680,7 @@ mod test_support {
     /// shares one `process::id()`, and the harness runs them on threads.
     pub fn scratch(prefix: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!(
-            "mdhero-{}-{}-{}",
+            "mid-{}-{}-{}",
             prefix,
             std::process::id(),
             COUNTER.fetch_add(1, Ordering::SeqCst)

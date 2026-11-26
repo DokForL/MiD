@@ -599,36 +599,36 @@
     if (!hasChosenLocale()) languageVisible = true;
 
     // Expose functions for native menu and OS file-open handlers
-    (window as any).__mdhero_open_file = () => { openVisible = true; };
-    (window as any).__mdhero_open_path = (path: string) => {
+    (window as any).__mid_open_file = () => { openVisible = true; };
+    (window as any).__mid_open_path = (path: string) => {
       if (path && rendererReady) {
         openFile(path);
       }
     };
-    (window as any).__mdhero_paste = () => {
+    (window as any).__mid_paste = () => {
       pasteDefaultMode = "paste";
       pasteVisible = true;
     };
-    (window as any).__mdhero_toggle_theme = () => {
+    (window as any).__mid_toggle_theme = () => {
       themeMode.update((m) => cycleTheme(m));
     };
-    (window as any).__mdhero_find = () => {
+    (window as any).__mid_find = () => {
       searchVisible = !searchVisible;
     };
     // File > Close Tab (Cmd/Ctrl+W). The menu item declared this accelerator
     // but lib.rs had no branch for its id, so the event was dropped — and
     // because the native menu consumes the key, the keydown fallback never ran
     // either: the shortcut and the menu item were both dead.
-    (window as any).__mdhero_close_tab = () => {
+    (window as any).__mid_close_tab = () => {
       void closeActiveTab();
     };
-    (window as any).__mdhero_print = () => {
+    (window as any).__mid_print = () => {
       printDocument();
     };
-    (window as any).__mdhero_zen = () => {
+    (window as any).__mid_zen = () => {
       zenMode = !zenMode;
     };
-    (window as any).__mdhero_about = () => {
+    (window as any).__mid_about = () => {
       aboutVisible = true;
     };
     // App-quit guard (#54): the red-button (CloseRequested) and Cmd+Q / menu
@@ -637,7 +637,7 @@
     // One prompt covers all dirty tabs. On "Keep Editing" we stay; otherwise
     // (Discard, no dirty tabs, or dialog failure) we quit via quit_app — a hard
     // exit, so we never trap the user in an app that can't close.
-    (window as any).__mdhero_quit = async () => {
+    (window as any).__mid_quit = async () => {
       const dirty = $tabs.filter((t) => t.dirty);
       if (dirty.length > 0) {
         const msg =
@@ -660,7 +660,7 @@
       saveProgressNow();
       invoke("quit_app").catch(() => {});
     };
-    (window as any).__mdhero_check_updates = async () => {
+    (window as any).__mid_check_updates = async () => {
       if (get(checkInFlight)) return;
       // Reset dismissal so a manual check always re-surfaces an available update.
       updateDismissed.set(false);
@@ -676,7 +676,7 @@
     // selection was stashed in the aiLookup runtime helper at contextmenu
     // capture time — we consume it here so a stale selection can't leak into
     // a future menu open.
-    (window as any).__mdhero_ai_lookup = async (menuId: string) => {
+    (window as any).__mid_ai_lookup = async (menuId: string) => {
       const selection = consumePendingSelection();
       if (menuId === "aimenu:google") {
         if (!selection.trim()) return;
@@ -1147,7 +1147,7 @@
       });
       tocVisible.set(false);
       tocEntries.set([]);
-      getCurrentWindow().setTitle("MDHero").catch(() => {});
+      getCurrentWindow().setTitle("MiD").catch(() => {});
       return;
     }
 
@@ -1169,7 +1169,7 @@
     // mid-edit (#44). Runs once per tab switch, so an explicit exit (Esc) sticks.
     presenting = isMarpDoc(tab.frontmatter) && get(settings).autoPresentMarp && !tab.isEditing;
 
-    getCurrentWindow().setTitle(`${tab.fileName} — MDHero`).catch(() => {});
+    getCurrentWindow().setTitle(`${tab.fileName} — MiD`).catch(() => {});
 
     const savedScroll = tab.scrollTop;
     tick().then(() => {

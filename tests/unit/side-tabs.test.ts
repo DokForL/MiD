@@ -66,7 +66,7 @@ describe("tabFolderLabel", () => {
   });
 
   it("keeps only the last two folders of a deep path", () => {
-    expect(label("/Users/ada/dev/mdhero/docs/README.md")).toBe("…/mdhero/docs");
+    expect(label("/Users/ada/dev/mid/docs/README.md")).toBe("…/mid/docs");
     expect(label("D:\\work\\client\\specs\\api\\README.md")).toBe("…/specs/api");
   });
 
@@ -102,7 +102,7 @@ describe("tabsNeedingFolder", () => {
   it("shows the name alone when every name is different", () => {
     const tabs = [
       tab("a", "todo.md", "/Users/ada/notes/todo.md"),
-      tab("b", "README.md", "/Users/ada/dev/mdhero/README.md"),
+      tab("b", "README.md", "/Users/ada/dev/mid/README.md"),
       tab("c", "Untitled", "new://1716000000000-0"),
     ];
     expect(tabsNeedingFolder(tabs)).toEqual(new Set());
@@ -110,7 +110,7 @@ describe("tabsNeedingFolder", () => {
 
   it("adds the folder to same-named files, and only to them", () => {
     const tabs = [
-      tab("a", "README.md", "/Users/ada/dev/mdhero/README.md"),
+      tab("a", "README.md", "/Users/ada/dev/mid/README.md"),
       tab("b", "todo.md", "/Users/ada/notes/todo.md"),
       tab("c", "README.md", "C:\\Users\\ada\\dev\\other\\README.md"),
     ];
@@ -119,7 +119,7 @@ describe("tabsNeedingFolder", () => {
 
   it("tells a local file from a web page of the same name", () => {
     const tabs = [
-      tab("a", "README.md", "/Users/ada/dev/mdhero/README.md"),
+      tab("a", "README.md", "/Users/ada/dev/mid/README.md"),
       tab("b", "README.md", "url://https://github.com/a/b/blob/main/README.md"),
     ];
     expect(tabsNeedingFolder(tabs)).toEqual(new Set(["a", "b"]));
