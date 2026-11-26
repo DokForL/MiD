@@ -317,6 +317,7 @@
     "closeTab": "关闭标签页",
     "find": "查找...",
     "toggleTheme": "切换主题",
+    "toggleScrollbar": "显示或隐藏滚动条",
     "cut": "剪切",
     "copy": "复制",
     "paste": "粘贴",

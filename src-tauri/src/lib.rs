@@ -200,6 +200,9 @@ pub fn run() {
                         "theme" => {
                             let _ = window.eval("window.__mid_toggle_theme?.()");
                         }
+                        "toggle_scrollbar" => {
+                            let _ = window.eval("window.__mid_toggle_scrollbar?.()");
+                        }
                         "find" => {
                             let _ = window.eval("window.__mid_find?.()");
                         }

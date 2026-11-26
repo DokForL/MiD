@@ -172,6 +172,7 @@ const MENU_KEYS = [
   "menu.find",
   "menu.view",
   "menu.toggleTheme",
+  "menu.toggleScrollbar",
   "menu.fullscreen",
   "menu.window",
   "menu.minimize",

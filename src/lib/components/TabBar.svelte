@@ -350,10 +350,6 @@
     background: #111113;
   }
 
-  .tabbar::-webkit-scrollbar {
-    height: 0;
-  }
-
   .tabbar-inner {
     display: flex;
     align-items: flex-end;

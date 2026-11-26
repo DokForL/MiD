@@ -147,6 +147,13 @@ pub fn create_menu_with_labels<R: Runtime>(
                 Some("CmdOrCtrl+Shift+T"),
             )?,
             &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(
+                app,
+                "toggle_scrollbar",
+                tr(labels, "menu.toggleScrollbar", "Toggle Scrollbar"),
+                true,
+                None::<&str>,
+            )?,
             &PredefinedMenuItem::fullscreen(
                 app,
                 predefined_label(labels, "menu.fullscreen"),

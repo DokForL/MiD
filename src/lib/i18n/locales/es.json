@@ -319,6 +319,7 @@
     "closeTab": "Cerrar pestaña",
     "find": "Buscar...",
     "toggleTheme": "Cambiar tema",
+    "toggleScrollbar": "Mostrar u ocultar la barra de desplazamiento",
     "cut": "Cortar",
     "copy": "Copiar",
     "paste": "Pegar",

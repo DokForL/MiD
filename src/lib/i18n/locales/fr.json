@@ -319,6 +319,7 @@
     "closeTab": "Fermer l'onglet",
     "find": "Rechercher...",
     "toggleTheme": "Changer de thème",
+    "toggleScrollbar": "Afficher ou masquer la barre de défilement",
     "cut": "Couper",
     "copy": "Copier",
     "paste": "Coller",

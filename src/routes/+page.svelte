@@ -623,6 +623,9 @@
     (window as any).__mid_toggle_theme = () => {
       themeMode.update((m) => cycleTheme(m));
     };
+    (window as any).__mid_toggle_scrollbar = () => {
+      document.documentElement.toggleAttribute("data-show-scrollbars");
+    };
     (window as any).__mid_find = () => {
       searchVisible = !searchVisible;
     };

@@ -36,6 +36,17 @@ html.dark {
   color: #e5e5e7;
 }
 
+/* Hide scrollbars on startup while preserving scroll input. */
+html:not([data-show-scrollbars]),
+html:not([data-show-scrollbars]) * {
+  scrollbar-width: none;
+}
+
+html:not([data-show-scrollbars])::-webkit-scrollbar,
+html:not([data-show-scrollbars]) ::-webkit-scrollbar {
+  display: none;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
