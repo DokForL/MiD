@@ -6,7 +6,7 @@
   import { recentFiles, removeRecentFile } from "$lib/stores/recents";
   import { pinnedFolders } from "$lib/stores/pinned";
   import { isUrl, toRawUrl, urlToFileName } from "$lib/utils/url";
-  import { renderFull } from "$lib/renderer/pipeline";
+  import { renderDocument } from "$lib/renderer/render-document";
   import { tabStore } from "$lib/stores/tabs";
   import { document as docStore } from "$lib/stores/document";
   import { basename, shortenHomePath } from "$lib/utils/path";
@@ -58,6 +58,7 @@
   }
 
   async function handleFetchUrl() {
+    if (urlLoading) return;
     const trimmed = urlInput.trim();
     if (!trimmed || !isUrl(trimmed)) {
       urlError = translate("openDialog.errValidUrl");
@@ -70,16 +71,15 @@
       const res = await fetch(rawUrl);
       if (!res.ok) {
         urlError = res.status === 404 ? translate("openDialog.err404") : res.status === 403 ? translate("openDialog.err403") : translate("openDialog.errFailed", { status: res.status });
-        urlLoading = false;
         return;
       }
       const markdown = await res.text();
       if (markdown.trim().startsWith("<!DOCTYPE") || markdown.trim().startsWith("<html")) {
         urlError = translate("openDialog.errHtml");
-        urlLoading = false;
         return;
       }
-      const result = renderFull(markdown);
+      const result = await renderDocument(markdown);
+      if (!visible || urlInput.trim() !== trimmed) return;
       const fileName = urlToFileName(trimmed);
       const urlPath = `url://${trimmed}`;
       tabStore.addTab(urlPath, fileName, markdown, result.html, result.frontmatter, result.wordCount);
@@ -88,8 +88,9 @@
       visible = false;
     } catch (err) {
       urlError = translate("openDialog.errNetwork", { msg: err instanceof Error ? err.message : translate("openDialog.errReach") });
+    } finally {
+      urlLoading = false;
     }
-    urlLoading = false;
   }
 
   function handleOpenSystem() {

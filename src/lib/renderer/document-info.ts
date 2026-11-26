@@ -51,3 +51,10 @@ function normalizePath(path: string): string {
 
   return `${prefix}${stack.join(separator)}`;
 }
+
+
+/** Dollar-delimited math needs at least an opening and a closing delimiter. */
+export function mayContainMath(markdown: string): boolean {
+  const first = markdown.indexOf("$");
+  return first !== -1 && markdown.indexOf("$", first + 1) !== -1;
+}

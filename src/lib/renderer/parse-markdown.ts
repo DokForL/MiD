@@ -1,0 +1,342 @@
+import { isMarpDoc } from "./document-info";
+import MarkdownIt from "markdown-it";
+import taskLists from "markdown-it-task-lists";
+import anchor from "markdown-it-anchor";
+import hljs from "highlight.js/lib/core";
+
+// Register common languages
+import javascript from "highlight.js/lib/languages/javascript";
+import typescript from "highlight.js/lib/languages/typescript";
+import python from "highlight.js/lib/languages/python";
+import rust from "highlight.js/lib/languages/rust";
+import go from "highlight.js/lib/languages/go";
+import bash from "highlight.js/lib/languages/bash";
+import json from "highlight.js/lib/languages/json";
+import yaml from "highlight.js/lib/languages/yaml";
+import xml from "highlight.js/lib/languages/xml";
+import css from "highlight.js/lib/languages/css";
+import sql from "highlight.js/lib/languages/sql";
+import markdown from "highlight.js/lib/languages/markdown";
+import java from "highlight.js/lib/languages/java";
+import c from "highlight.js/lib/languages/c";
+import cpp from "highlight.js/lib/languages/cpp";
+import shell from "highlight.js/lib/languages/shell";
+import diff from "highlight.js/lib/languages/diff";
+import dockerfile from "highlight.js/lib/languages/dockerfile";
+import ini from "highlight.js/lib/languages/ini";
+import swift from "highlight.js/lib/languages/swift";
+import kotlin from "highlight.js/lib/languages/kotlin";
+import ruby from "highlight.js/lib/languages/ruby";
+import php from "highlight.js/lib/languages/php";
+import plaintext from "highlight.js/lib/languages/plaintext";
+
+hljs.registerLanguage("javascript", javascript);
+hljs.registerLanguage("typescript", typescript);
+hljs.registerLanguage("python", python);
+hljs.registerLanguage("rust", rust);
+hljs.registerLanguage("go", go);
+hljs.registerLanguage("bash", bash);
+hljs.registerLanguage("json", json);
+hljs.registerLanguage("yaml", yaml);
+hljs.registerLanguage("xml", xml);
+hljs.registerLanguage("html", xml);
+hljs.registerLanguage("css", css);
+hljs.registerLanguage("sql", sql);
+hljs.registerLanguage("markdown", markdown);
+hljs.registerLanguage("java", java);
+hljs.registerLanguage("c", c);
+hljs.registerLanguage("cpp", cpp);
+hljs.registerLanguage("shell", shell);
+hljs.registerLanguage("diff", diff);
+hljs.registerLanguage("dockerfile", dockerfile);
+hljs.registerLanguage("toml", ini);
+hljs.registerLanguage("ini", ini);
+hljs.registerLanguage("swift", swift);
+hljs.registerLanguage("kotlin", kotlin);
+hljs.registerLanguage("ruby", ruby);
+hljs.registerLanguage("php", php);
+hljs.registerLanguage("jsx", javascript);
+hljs.registerLanguage("tsx", typescript);
+// Also registers the `text` and `txt` aliases. Unregistered, those fences fell
+// through to highlightAuto, which guessed a language and coloured prose.
+hljs.registerLanguage("plaintext", plaintext);
+
+export interface ParsedMarkdown {
+  raw: string;
+  frontmatter: Record<string, unknown> | null;
+  wordCount: number;
+  isMarp: boolean;
+}
+
+/** Matches a leading `---\n…\n---\n` frontmatter block (same shape renderFull strips). */
+const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
+
+/**
+ * Drop a byte-order mark at offset 0.
+ *
+ * U+FEFF there is an encoding *signature*, not document content — Notepad's
+ * "UTF-8 with BOM" and many Windows tools prepend it. It is valid UTF-8, so
+ * Rust's `read_to_string` and Swift's `String(contentsOf:)` both hand it
+ * through untouched. markdown-it then sees `\uFEFF# Heading`, a line that no
+ * longer begins with `#`, and *every* leading block construct degrades to a
+ * paragraph — heading, list, blockquote, fenced code — taking frontmatter
+ * parsing and Marp detection down with it (#122).
+ *
+ * Only offset 0 is stripped. Anywhere else U+FEFF is a legitimate zero-width
+ * no-break space that belongs to the document.
+ *
+ * This lives in the pipeline rather than in the Rust read command because the
+ * Quick Look extension never calls that command — it reads the file itself in
+ * `quicklook/Preview.swift` and shares only this module. Stripping here is what
+ * fixes both hosts at once.
+ */
+function stripBom(markdown: string): string {
+  return markdown.charCodeAt(0) === 0xfeff ? markdown.slice(1) : markdown;
+}
+
+/**
+ * Return the markdown body with any leading YAML-ish frontmatter block removed.
+ * `renderFull` strips frontmatter internally, but the stored document content
+ * keeps it — Marp slide splitting needs the body without it (#44).
+ */
+export function stripFrontmatter(markdown: string): string {
+  const source = stripBom(markdown);
+  const m = source.match(FRONTMATTER_RE);
+  return m ? m[2] : source;
+}
+
+let md: MarkdownIt | null = null;
+let mathRenderer: MarkdownIt | undefined;
+export type MathPlugin = (renderer: MarkdownIt) => void;
+
+/**
+ * Stamp top-level block elements with `data-source-line="N"` (0-indexed line in
+ * source markdown). Used by the scroll-sync logic to map view ↔ raw ↔ editor.
+ */
+function addSourceLinePlugin(mdInstance: MarkdownIt) {
+  mdInstance.core.ruler.push("source-line", (state) => {
+    for (const token of state.tokens) {
+      if (token.map && token.level === 0 && token.type.endsWith("_open")) {
+        token.attrSet("data-source-line", String(token.map[0]));
+      }
+    }
+  });
+}
+
+// Text-bearing blocks that should auto-detect direction. Code and math are
+// deliberately excluded — they must stay LTR regardless of surrounding text.
+const DIR_AUTO_BLOCKS = new Set([
+  "paragraph_open",
+  "heading_open",
+  "blockquote_open",
+  "list_item_open",
+  "td_open",
+  "th_open",
+]);
+
+// A paragraph whose whole content is `<div dir="rtl">` / `<div dir="ltr">` (any
+// other attributes tolerated and ignored) or `</div>`. Raw HTML is disabled in
+// the renderer, so these arrive as ordinary paragraphs of text; we recognise
+// exactly these two shapes and nothing else.
+//
+// Two guards keep this linear in the input, because the renderer runs on the
+// UI thread and a document is attacker-controlled: the tag shape is checked
+// with a pattern that has no overlapping quantifiers, and the `dir` value is
+// then read from the attribute text by a second bounded search. A wrapper line
+// is a few dozen characters, so anything longer is not even inspected.
+const DIR_WRAPPER_MAX_LEN = 256;
+const DIR_WRAPPER_TAG = /^<div(?:\s[^>]*)?>$/i;
+const DIR_WRAPPER_VALUE = /(?:^|\s)dir\s*=\s*["']?(rtl|ltr)["']?(?=\s|>|$)/i;
+const DIR_WRAPPER_CLOSE = /^<\/div\s*>$/i;
+
+/** "rtl" / "ltr" when `content` is exactly a direction wrapper line, else null. */
+function wrapperDirection(content: string): "rtl" | "ltr" | null {
+  if (content.length > DIR_WRAPPER_MAX_LEN || !DIR_WRAPPER_TAG.test(content)) return null;
+  const m = content.slice(4, -1).match(DIR_WRAPPER_VALUE);
+  return m ? (m[1].toLowerCase() as "rtl" | "ltr") : null;
+}
+
+/**
+ * Give each text-bearing block a direction (#64, #95).
+ *
+ * By default that is `dir="auto"`: the block picks its own base direction from
+ * its first strong-directional character, so RTL paragraphs (Hebrew/Arabic)
+ * right-align on their own, like the browser and VSCode, without forcing a
+ * whole-document direction. Mixed LTR/RTL docs resolve per block.
+ *
+ * Authors of RTL documents also write `<div dir="rtl">` … `</div>` around
+ * sections, the way GitHub renders them. Raw HTML stays off in this renderer,
+ * so those lines would otherwise print as literal text; instead a paragraph
+ * that is exactly such a wrapper line is dropped and every block inside gets
+ * that explicit direction. That also covers what `auto` gets wrong on its own —
+ * a Persian paragraph beginning with a product name or a number. Nothing else
+ * about HTML changes. `dir` is a standard global attribute, so DOMPurify keeps
+ * it. A `</div>` with no open wrapper stays as text.
+ */
+function addDirPlugin(mdInstance: MarkdownIt) {
+  mdInstance.core.ruler.push("dir", (state) => {
+    const tokens = state.tokens;
+    const kept: typeof tokens = [];
+    const stack: string[] = [];
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      // A wrapper is a paragraph of its own. `hidden` paragraphs are the
+      // implicit ones inside tight list items; a `<div>` typed as a bullet is
+      // text, not a wrapper, so bullets never vanish.
+      if (
+        token.type === "paragraph_open" &&
+        !token.hidden &&
+        tokens[i + 1]?.type === "inline" &&
+        tokens[i + 2]?.type === "paragraph_close"
+      ) {
+        const content = tokens[i + 1].content.trim();
+        const open = wrapperDirection(content);
+        if (open) {
+          stack.push(open);
+          i += 2;
+          continue;
+        }
+        if (
+          stack.length > 0 &&
+          content.length <= DIR_WRAPPER_MAX_LEN &&
+          DIR_WRAPPER_CLOSE.test(content)
+        ) {
+          stack.pop();
+          i += 2;
+          continue;
+        }
+      }
+      if (DIR_AUTO_BLOCKS.has(token.type)) {
+        token.attrSet("dir", stack.length > 0 ? stack[stack.length - 1] : "auto");
+      }
+      kept.push(token);
+    }
+    state.tokens = kept;
+  });
+}
+
+const AUTO_LANGUAGES = ["javascript", "python", "bash", "json", "yaml", "xml", "css", "sql"];
+const MAX_AUTO_LENGTH = 4096;
+const MAX_AUTO_FENCES = 24;
+const MAX_CACHE_BYTES = 512 * 1024;
+const MAX_CACHE_ENTRIES = 256;
+const highlightedFences = new Map<string, { html: string; bytes: number }>();
+let cacheBytes = 0;
+let autoFencesRemaining = 0;
+
+function highlightFence(source: string, language: string): string {
+  if (language === "mermaid") return "";
+  const explicit = language && hljs.getLanguage(language);
+  if (!explicit && source.length > MAX_AUTO_LENGTH) return "";
+
+  const key = JSON.stringify([language, source]);
+  const cached = highlightedFences.get(key);
+  if (cached) {
+    highlightedFences.delete(key);
+    highlightedFences.set(key, cached);
+    return cached.html;
+  }
+
+  if (!explicit && autoFencesRemaining <= 0) return "";
+
+  let html: string;
+  try {
+    if (explicit) {
+      html = hljs.highlight(source, { language }).value;
+    } else {
+      autoFencesRemaining--;
+      html = hljs.highlightAuto(source, AUTO_LANGUAGES).value;
+    }
+  } catch {
+    return "";
+  }
+
+  const bytes = (key.length + html.length) * 2;
+  if (bytes <= MAX_CACHE_BYTES) {
+    for (const [oldKey, old] of highlightedFences) {
+      if (cacheBytes + bytes <= MAX_CACHE_BYTES && highlightedFences.size < MAX_CACHE_ENTRIES) break;
+      cacheBytes -= old.bytes;
+      highlightedFences.delete(oldKey);
+    }
+    highlightedFences.set(key, { html, bytes });
+    cacheBytes += bytes;
+  }
+  return html;
+}
+
+function createRenderer(math?: MathPlugin): MarkdownIt {
+  const renderer = new MarkdownIt({
+    html: false,
+    linkify: true,
+    typographer: true,
+    highlight: highlightFence,
+  });
+
+  math?.(renderer);
+
+  renderer.use(taskLists, { enabled: false, label: true });
+  renderer.use(anchor, {
+    permalink: false,
+    slugify: (s: string) =>
+      s
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, "")
+        .replace(/\s+/g, "-"),
+  });
+  addSourceLinePlugin(renderer);
+  addDirPlugin(renderer);
+
+  return renderer;
+}
+
+export function initRenderer(math?: MathPlugin): MarkdownIt {
+  return math ? mathRenderer ??= createRenderer(math) : md ??= createRenderer();
+}
+
+export function parseMarkdown(markdown: string, math?: MathPlugin): ParsedMarkdown {
+  const renderer = initRenderer(math);
+  autoFencesRemaining = MAX_AUTO_FENCES;
+
+  // A leading BOM would make the first block unparseable; see stripBom (#122).
+  // Dropping it cannot shift `data-source-line`, since it removes no newline.
+  const source = stripBom(markdown);
+
+  // Extract frontmatter
+  let content = source;
+  let frontmatter: Record<string, unknown> | null = null;
+  const fmMatch = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+  if (fmMatch) {
+    try {
+      const data: Record<string, unknown> = {};
+      fmMatch[1].split("\n").forEach((line) => {
+        const colonIdx = line.indexOf(":");
+        if (colonIdx > 0) {
+          const key = line.slice(0, colonIdx).trim();
+          let val: unknown = line.slice(colonIdx + 1).trim();
+          if (typeof val === "string" && val.startsWith("[") && val.endsWith("]")) {
+            val = val.slice(1, -1).split(",").map((s) => s.trim());
+          }
+          if (typeof val === "string" && ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'")))) {
+            val = val.slice(1, -1);
+          }
+          if (key) data[key] = val;
+        }
+      });
+      if (Object.keys(data).length > 0) {
+        frontmatter = data;
+        content = fmMatch[2];
+      }
+    } catch {
+      // Not valid frontmatter
+    }
+  }
+
+  const wordCount = content.trim().split(/\s+/).filter(Boolean).length;
+
+  return { raw: renderer.render(content), frontmatter, wordCount, isMarp: isMarpDoc(frontmatter) };
+}
+
+export function isInitialized(): boolean {
+  return !!(md || mathRenderer);
+}

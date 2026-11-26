@@ -40,12 +40,12 @@ export async function openFile(path: string, pendingTabId?: string): Promise<voi
       error: null,
     });
 
-    const [content, { renderFull }] = await Promise.all([
+    const [content, { renderDocument }] = await Promise.all([
       readMarkdownFile(absolutePath),
-      import("../renderer/pipeline"),
+      import("../renderer/render-document"),
     ]);
     if (!isCurrent()) return;
-    const result = renderFull(content, getBaseDir(absolutePath));
+    const result = await renderDocument(content, getBaseDir(absolutePath), true);
     if (!isCurrent()) return;
 
     // Whitelist the document's local images with the asset protocol before the
@@ -170,8 +170,8 @@ export async function reloadFile(path: string): Promise<void> {
     const absolutePath = await resolvePath(path);
     const content = await readMarkdownFile(absolutePath);
     const baseDir = getBaseDir(absolutePath);
-    const { renderFull } = await import("../renderer/pipeline");
-    const result = renderFull(content, baseDir);
+    const { renderDocument } = await import("../renderer/render-document");
+    const result = await renderDocument(content, baseDir, true);
     const fileName = basename(absolutePath);
 
     await allowAssets(result.assetPaths, absolutePath);

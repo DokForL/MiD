@@ -206,20 +206,19 @@
   });
 
   // Live-render the editor content into the split preview pane, debounced so
-  // fast typing stays smooth. ponytail: full re-render per debounce tick; fine
-  // for typical docs — add incremental rendering only if a huge file lags.
+  // fast typing stays smooth. Discard jobs superseded by edits or navigation.
   $effect(() => {
     if (!splitMode || !activeTab?.isEditing) return;
     const { editContent: content, filePath, id } = activeTab;
     const baseDir = getBaseDir(filePath);
-    let stale = false;
-    const isCurrent = () => !stale && splitMode && activeTab?.id === id
+    const controller = new AbortController();
+    const isCurrent = () => !controller.signal.aborted && splitMode && activeTab?.id === id
       && activeTab.editContent === content;
     const timer = setTimeout(async () => {
       try {
-        const { renderFull } = await import("$lib/renderer/pipeline");
+        const { renderDocument } = await import("$lib/renderer/render-document");
         if (!isCurrent()) return;
-        const result = renderFull(content, baseDir);
+        const result = await renderDocument(content, baseDir, false, controller.signal);
         await allowAssets(result.assetPaths, filePath);
         if (!isCurrent()) return;
         splitPreview = { tabId: id, html: result.html };
@@ -230,7 +229,7 @@
       }
     }, 120);
     return () => {
-      stale = true;
+      controller.abort();
       clearTimeout(timer);
     };
   });
@@ -306,9 +305,11 @@
       if (activeTab.isEditing && activeTab.dirty) {
         const baseDir = getBaseDir(activeTab.filePath);
         const tabId = activeTab.id;
-        const { renderFull } = await import("$lib/renderer/pipeline");
+        const { renderDocument } = await import("$lib/renderer/render-document");
         if (activeTab?.id !== tabId || !activeTab.isEditing) return;
-        const result = renderFull(activeTab.editContent, baseDir);
+        const content = activeTab.editContent;
+        const result = await renderDocument(content, baseDir);
+        if (activeTab?.id !== tabId || !activeTab.isEditing || activeTab.editContent !== content) return;
         // Fire-and-forget: referenced images were almost always allowed at open;
         // a brand-new external image typed mid-edit self-heals on the next
         // render/reload. Not worth making this sync path async (#31).
@@ -371,8 +372,8 @@
         await saveFile(tab.filePath, tab.editContent);
       }
       const baseDir = getBaseDir(targetPath);
-      const { renderFull } = await import("$lib/renderer/pipeline");
-      const result = renderFull(tab.editContent, baseDir);
+      const { renderDocument } = await import("$lib/renderer/render-document");
+      const result = await renderDocument(tab.editContent, baseDir, true);
       await allowAssets(result.assetPaths, targetPath);
       tabStore.markSaved(tab.id);
       tabStore.updateTabContent(

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { splitSlides } from "$lib/renderer/slides";
-  import { renderFull, stripFrontmatter } from "$lib/renderer/pipeline";
+  import { renderDocument } from "$lib/renderer/render-document";
+  import { stripFrontmatter } from "$lib/renderer/parse-markdown";
   import MarkdownRenderer from "./MarkdownRenderer.svelte";
   import { t } from "$lib/i18n";
 
@@ -18,12 +19,20 @@
     onLocalLink?: (href: string) => void;
   } = $props();
 
-  // Split once per content change, then render each slide's HTML up front so
-  // navigation is instant (decks are small; assets were already whitelisted when
-  // the file opened, so no per-slide allow_assets call is needed).
-  let slideHtmls = $derived(
-    splitSlides(stripFrontmatter(content)).map((s) => renderFull(s, baseDir).html)
-  );
+  let slideHtmls = $state<string[]>([]);
+  $effect(() => {
+    const slides = splitSlides(stripFrontmatter(content));
+    const directory = baseDir;
+    const controller = new AbortController();
+    void Promise.all(slides.map((slide) => renderDocument(slide, directory, false, controller.signal)))
+      .then((results) => {
+        if (!controller.signal.aborted) slideHtmls = results.map((result) => result.html);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) console.error("Could not render presentation:", error);
+      });
+    return () => controller.abort();
+  });
 
   let current = $state(0);
 

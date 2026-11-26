@@ -2,9 +2,10 @@
   import { isLlmEscaped, unescapeLlmOutput } from "$lib/utils/llm";
   import { MOD } from "$lib/utils/platform";
   import { isUrl, toRawUrl, urlToFileName } from "$lib/utils/url";
-  import { renderFull } from "$lib/renderer/pipeline";
+  import { renderDocument } from "$lib/renderer/render-document";
   import { tabStore } from "$lib/stores/tabs";
   import { document as docStore } from "$lib/stores/document";
+  import { showToast } from "$lib/stores/toast";
   import { t, translate } from "$lib/i18n";
 
   let { visible = $bindable(false), defaultMode = "paste" }: { visible: boolean; defaultMode?: "paste" | "url" } = $props();
@@ -15,40 +16,50 @@
   let llmMode = $state(true);
   let autoDetected = $state(false);
   let urlLoading = $state(false);
+  let rendering = $state(false);
   let urlError = $state("");
 
-  function handleRender() {
-    if (!text.trim()) return;
+  async function handleRender() {
+    if (rendering || !text.trim()) return;
+    rendering = true;
 
     let markdown = text;
     if (llmMode && isLlmEscaped(text)) {
       markdown = unescapeLlmOutput(text);
     }
 
-    const result = renderFull(markdown);
-    const now = new Date();
-    const timeLabel = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const fileName = translate("pasteModal.pastedTitle", { time: timeLabel });
+    try {
+      const result = await renderDocument(markdown);
+      if (!visible) return;
+      const now = new Date();
+      const timeLabel = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      const fileName = translate("pasteModal.pastedTitle", { time: timeLabel });
 
-    const pastePath = `paste://${Date.now()}`;
-    tabStore.addTab(pastePath, fileName, markdown, result.html, result.frontmatter, result.wordCount);
+      const pastePath = `paste://${Date.now()}`;
+      tabStore.addTab(pastePath, fileName, markdown, result.html, result.frontmatter, result.wordCount);
 
-    docStore.set({
-      filePath: pastePath,
-      fileName,
-      content: markdown,
-      renderedHtml: result.html,
-      frontmatter: result.frontmatter,
-      wordCount: result.wordCount,
-      loading: false,
-      error: null,
-    });
+      docStore.set({
+        filePath: pastePath,
+        fileName,
+        content: markdown,
+        renderedHtml: result.html,
+        frontmatter: result.frontmatter,
+        wordCount: result.wordCount,
+        loading: false,
+        error: null,
+      });
 
-    text = "";
-    visible = false;
+      text = "";
+      visible = false;
+    } catch (error) {
+      if (visible) showToast(translate("files.openFailed", { err: String(error) }));
+    } finally {
+      rendering = false;
+    }
   }
 
   async function handleFetchUrl() {
+    if (urlLoading) return;
     const trimmed = urlInput.trim();
     if (!trimmed || !isUrl(trimmed)) {
       urlError = translate("pasteModal.errValidUrl");
@@ -70,7 +81,6 @@
         } else {
           urlError = translate("pasteModal.errFetch", { status: res.status });
         }
-        urlLoading = false;
         return;
       }
 
@@ -79,11 +89,11 @@
       // Check if it looks like markdown/text (not HTML or binary)
       if (markdown.trim().startsWith("<!DOCTYPE") || markdown.trim().startsWith("<html")) {
         urlError = translate("pasteModal.errHtml");
-        urlLoading = false;
         return;
       }
 
-      const result = renderFull(markdown);
+      const result = await renderDocument(markdown);
+      if (!visible || urlInput.trim() !== trimmed) return;
       const fileName = urlToFileName(trimmed);
       const urlPath = `url://${trimmed}`;
 
@@ -104,9 +114,9 @@
       visible = false;
     } catch (err) {
       urlError = translate("pasteModal.errNetwork", { msg: err instanceof Error ? err.message : translate("pasteModal.errReach") });
+    } finally {
+      urlLoading = false;
     }
-
-    urlLoading = false;
   }
 
   function handleInput() {
@@ -190,7 +200,7 @@
           <span class="modal-hint">{$t('pasteModal.enterToRender', { mod: MOD })}</span>
           <div class="modal-actions">
             <button onclick={() => (visible = false)} class="btn-cancel">{$t('common.cancel')}</button>
-            <button onclick={handleRender} disabled={!text.trim()} class="btn-render">{$t('pasteModal.render')}</button>
+            <button onclick={handleRender} disabled={rendering || !text.trim()} class="btn-render">{$t('pasteModal.render')}</button>
           </div>
         </div>
       {:else}
