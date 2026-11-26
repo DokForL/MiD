@@ -38,8 +38,7 @@ fn has_allowed_extension(p: &Path) -> bool {
         .unwrap_or(false)
 }
 
-#[tauri::command]
-pub fn read_markdown_file(path: String) -> Result<String, String> {
+fn read_markdown_text(path: String) -> Result<String, String> {
     let p = Path::new(&path);
 
     if !has_allowed_extension(p) {
@@ -69,6 +68,21 @@ pub fn read_markdown_file(path: String) -> Result<String, String> {
             format!("Failed to read file: {}", e)
         }
     })
+}
+
+#[tauri::command]
+pub fn read_markdown_file(path: String) -> Result<tauri::ipc::Response, String> {
+    use tauri::ipc::{InvokeResponseBody, Response};
+
+    let content = read_markdown_text(path)?;
+    // Large responses benefit from skipping JSON escaping and parsing.
+    if content.len() >= 1024 * 1024 {
+        Ok(Response::new(content.into_bytes()))
+    } else {
+        serde_json::to_string(&content)
+            .map(|json| Response::new(InvokeResponseBody::Json(json)))
+            .map_err(|error| error.to_string())
+    }
 }
 
 #[tauri::command]
@@ -571,7 +585,7 @@ pub fn show_ai_context_menu(
 #[cfg(test)]
 mod fs_scope_tests {
     use super::test_support::scratch;
-    use super::{has_allowed_extension, read_markdown_file, write_markdown_file};
+    use super::{has_allowed_extension, read_markdown_text, write_markdown_file};
     use std::fs;
     use std::path::Path;
 
@@ -601,7 +615,7 @@ mod fs_scope_tests {
     fn read_and_write_reject_a_non_text_path_before_touching_disk() {
         // The path does not exist; the extension guard must fire first, so the
         // error is the refusal, never a "file not found".
-        let err = read_markdown_file("/home/u/.ssh/id_rsa".into()).unwrap_err();
+        let err = read_markdown_text("/home/u/.ssh/id_rsa".into()).unwrap_err();
         assert!(err.contains("Refusing to read"), "got: {err}");
         let err = write_markdown_file("/root/.ssh/authorized_keys".into(), "x".into()).unwrap_err();
         assert!(err.contains("Refusing to write"), "got: {err}");
@@ -618,7 +632,7 @@ mod fs_scope_tests {
         let file = dir.join("bom.md");
         fs::write(&file, b"\xEF\xBB\xBF# Head\n").unwrap();
 
-        let got = read_markdown_file(file.to_string_lossy().into_owned()).unwrap();
+        let got = read_markdown_text(file.to_string_lossy().into_owned()).unwrap();
         assert_eq!(got, "\u{FEFF}# Head\n");
 
         fs::remove_dir_all(&dir).ok();
@@ -634,7 +648,7 @@ mod fs_scope_tests {
         // UTF-16 LE BOM followed by "# Hi"
         fs::write(&file, b"\xFF\xFE\x23\x00\x20\x00\x48\x00\x69\x00").unwrap();
 
-        let err = read_markdown_file(file.to_string_lossy().into_owned()).unwrap_err();
+        let err = read_markdown_text(file.to_string_lossy().into_owned()).unwrap_err();
         assert!(err.contains("not UTF-8 encoded"), "got: {err}");
         assert!(err.contains("Re-save it as UTF-8"), "got: {err}");
         assert!(!err.contains("stream did not contain"), "raw io error leaked: {err}");

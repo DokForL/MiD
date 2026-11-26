@@ -10,7 +10,11 @@ import { basename } from "../utils/path";
 import { translate } from "../i18n";
 
 export async function readMarkdownFile(path: string): Promise<string> {
-  return invoke<string>("read_markdown_file", { path });
+  const content = await invoke<string | ArrayBuffer | number[]>("read_markdown_file", { path });
+  if (typeof content === "string") return content;
+  const bytes = Array.isArray(content) ? Uint8Array.from(content) : content;
+  // The Markdown pipeline handles the BOM consistently for both IPC paths.
+  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
 }
 
 export async function saveFile(path: string, content: string): Promise<void> {

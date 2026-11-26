@@ -20,7 +20,7 @@ vi.mock("../../src/lib/stores/tabs", () => ({
   tabStore: { updateTabContent, addTab, rebindPath, setEditing: vi.fn(), getActiveTab: () => activeTab },
 }));
 
-const { reloadFile, openFile, openFileDialog, saveAsNewDocument, watchFile, unwatchFile } = await import("../../src/lib/tauri/files");
+const { reloadFile, openFile, openFileDialog, readMarkdownFile, saveAsNewDocument, watchFile, unwatchFile } = await import("../../src/lib/tauri/files");
 
 const calls = (cmd: string) => invoke.mock.calls.filter((c) => c[0] === cmd).map((c) => c[1]);
 
@@ -118,5 +118,19 @@ describe("watch lifecycle", () => {
     unwatchFile("/docs/a.md");
     expect(calls("watch_file")).toEqual([{ path: "/docs/a.md" }]);
     expect(calls("unwatch_file")).toEqual([{ path: "/docs/a.md" }]);
+  });
+});
+
+describe("Markdown IPC decoding", () => {
+  it("accepts a string response for ordinary files", async () => {
+    await expect(readMarkdownFile("/docs/a.md")).resolves.toBe("# from disk");
+  });
+
+  it("preserves BOM and unicode in binary and array responses", async () => {
+    const original = "\uFEFF# Résumé 😃";
+    const bytes = new TextEncoder().encode(original);
+    invoke.mockResolvedValueOnce(bytes.buffer).mockResolvedValueOnce(Array.from(bytes));
+    await expect(readMarkdownFile("/docs/a.md")).resolves.toBe(original);
+    await expect(readMarkdownFile("/docs/a.md")).resolves.toBe(original);
   });
 });
