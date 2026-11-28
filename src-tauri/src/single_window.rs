@@ -1,14 +1,12 @@
-//! Opt-in "open files in the existing window" mode (#71).
+//! "Open files in the existing window" mode (#71).
 //!
 //! Whether a launch joins the running window has to be decided by the new
 //! process before it builds its own window — long before its webview, and the
 //! settings kept in localStorage, exist. So this one preference lives in a file
 //! Rust reads at startup.
 //!
-//! Off by default: a launch opening its own window stays the behaviour, as the
-//! discussion on #71 asked. On macOS the setting does not apply, since the OS
-//! already routes a file opened while MiD runs to the running app
-//! (`RunEvent::Opened`).
+//! Reuse the running window by default. On macOS, the OS already routes file
+//! opens to the running app (`RunEvent::Opened`).
 
 use std::path::PathBuf;
 
@@ -33,14 +31,14 @@ fn prefs_path(identifier: &str) -> Option<PathBuf> {
 fn parse_enabled(json: &str) -> bool {
     serde_json::from_str::<WindowMode>(json)
         .map(|mode| mode.open_in_existing_window)
-        .unwrap_or(false)
+        .unwrap_or(true)
 }
 
 pub fn is_enabled(identifier: &str) -> bool {
     prefs_path(identifier)
         .and_then(|path| std::fs::read_to_string(path).ok())
         .map(|json| parse_enabled(&json))
-        .unwrap_or(false)
+        .unwrap_or(true)
 }
 
 /// Whether the single-instance plugin can be registered on this machine.
@@ -138,16 +136,16 @@ mod tests {
     }
 
     #[test]
-    fn anything_unreadable_means_off() {
-        assert!(!parse_enabled(""));
-        assert!(!parse_enabled("not json"));
-        assert!(!parse_enabled("{}"));
-        assert!(!parse_enabled(r#"{"openInExistingWindow":"yes"}"#));
+    fn invalid_preferences_use_the_default() {
+        assert!(parse_enabled(""));
+        assert!(parse_enabled("not json"));
+        assert!(parse_enabled("{}"));
+        assert!(parse_enabled(r#"{"openInExistingWindow":"yes"}"#));
     }
 
     #[test]
-    fn no_preference_file_means_off() {
-        assert!(!is_enabled("com.mid.test.no-such-identifier"));
+    fn no_preference_file_reuses_the_existing_window() {
+        assert!(is_enabled("com.mid.test.no-such-identifier"));
     }
 
     #[cfg(any(target_os = "windows", target_os = "linux"))]
